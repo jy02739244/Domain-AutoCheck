@@ -4,4 +4,4 @@
 
 ## 部署流程
 ### 1.创建workers项目
-来到[Cloudflare网站](www.cloudflare.com)
+来到[Cloudflare网站](https://www.cloudflare.com)
