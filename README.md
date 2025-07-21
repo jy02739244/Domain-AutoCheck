@@ -4,4 +4,4 @@
 
 ## 部署流程
 ### 1.创建workers项目
-来到[Cloudflare网站](https://www.cloudflare.com)
+来到[Cloudflare网站](https://www.cloudflare.com)，登录账户后点击左侧`计算机`，选择`Workers和Pages`，选择右上方的`创建`，选择`从 Hello World! 开始`，名字随便取，自己认得就行，然后点击`部署`
