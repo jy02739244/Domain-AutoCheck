@@ -2,8 +2,8 @@
 /*使用KV存储域名信息*/
 
 // iconfont阿里巴巴图标库
-const ICONFONT_CSS = '//at.alicdn.com/t/c/font_4973034_fdg1q0bn7c5.css';
-const ICONFONT_JS = '//at.alicdn.com/t/c/font_4973034_fdg1q0bn7c5.js';
+const ICONFONT_CSS = '//at.alicdn.com/t/c/font_4973034_ehjc2dhuu76.css';
+const ICONFONT_JS = '//at.alicdn.com/t/c/font_4973034_ehjc2dhuu76.js';
 
 // 网站图标和背景图片，可在环境变量中设置
 const DEFAULT_LOGO = 'https://imgr2.952536.xyz/Hexo/Article/domain-outline.png'; // 默认Logo图片，外置变量名为LOGO_URL
@@ -486,6 +486,70 @@ const getHTMLContent = (title) => `
             font-size: 0.75rem;
             color: rgba(255, 255, 255, 0.8);
             margin-top: 3px;
+        }
+        
+        /* 骨架屏样式 */
+        .skeleton-card {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            animation: skeleton-pulse 1.5s infinite ease-in-out;
+        }
+        
+        .skeleton-header {
+            background-color: rgba(255, 255, 255, 0.15);
+            padding: 16px;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+        }
+        
+        .skeleton-text-lg {
+            height: 24px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            margin-bottom: 8px;
+            width: 70%;
+        }
+        
+        .skeleton-text-sm {
+            height: 16px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            width: 50%;
+        }
+        
+        .skeleton-text {
+            height: 16px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            margin-bottom: 8px;
+            width: 90%;
+        }
+        
+        .skeleton-progress {
+            height: 24px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            margin-top: 16px;
+        }
+        
+        @keyframes skeleton-pulse {
+            0% {
+                opacity: 0.6;
+            }
+            50% {
+                opacity: 0.8;
+            }
+            100% {
+                opacity: 0.6;
+            }
+        }
+        
+        /* 自定义测试成功消息的颜色 */
+        .telegram-test-success {
+            color:rgb(19, 221, 144) !important; /* 紫色 */
+            font-weight: 500;
         }
         
         .domain-status {
@@ -1441,8 +1505,8 @@ const getHTMLContent = (title) => `
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><span style="color: white;">取消</span></button>
-                    <button type="button" class="btn btn-primary" id="saveDomainBtn"><span style="color: white;">保存</span></button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><span style="color: white;"><i class="iconfont icon-xmark"></i> 取消</span></button>
+                                <button type="button" class="btn btn-primary" id="saveDomainBtn"><span style="color: white;"><i class="iconfont icon-save-3-fill"></i> 保存</span></button>
                 </div>
             </div>
         </div>
@@ -1487,8 +1551,8 @@ const getHTMLContent = (title) => `
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><span style="color: white;">取消</span></button>
-                    <button type="button" class="btn btn-primary" id="saveSettingsBtn"><span style="color: white;">保存设置</span></button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><span style="color: white;"><i class="iconfont icon-xmark"></i> 取消</span></button>
+                                <button type="button" class="btn btn-primary" id="saveSettingsBtn"><span style="color: white;"><i class="iconfont icon-save-3-fill"></i> 保存设置</span></button>
                 </div>
             </div>
         </div>
@@ -1506,8 +1570,8 @@ const getHTMLContent = (title) => `
                     <p>确定要删除域名 <span id="deleteModalDomainName"></span> 吗？此操作不可撤销。</p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><span style="color: white;">取消</span></button>
-                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn"><span style="color: white;">删除</span></button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><span style="color: white;"><i class="iconfont icon-xmark"></i> 取消</span></button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn"><span style="color: white;"><i class="iconfont icon-shanchu"></i> 删除</span></button>
                 </div>
             </div>
         </div>
@@ -1540,8 +1604,8 @@ const getHTMLContent = (title) => `
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-success" id="confirmRenewBtn">确认续期</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="iconfont icon-xmark"></i> 取消</button>
+                    <button type="button" class="btn btn-success" id="confirmRenewBtn"><i class="iconfont icon-arrows-rotate"></i> 确认续期</button>
                 </div>
             </div>
         </div>
@@ -1586,9 +1650,19 @@ const getHTMLContent = (title) => `
         
         // 页面加载完成后执行
         document.addEventListener('DOMContentLoaded', () => {
-            loadDomains();
-            loadTelegramConfig();
+            console.log('DOMContentLoaded 事件触发');
+            
+            // 设置事件监听器
             setupEventListeners();
+            
+            // 确保DOM元素已完全加载
+            setTimeout(() => {
+                console.log('开始加载数据');
+                // 使用Promise.all并行加载数据
+                Promise.all([loadDomains(), loadTelegramConfig()])
+                    .then(() => console.log('数据加载完成'))
+                    .catch(error => console.error('数据加载错误:', error));
+            }, 300);
             
             // 设置初始视图模式为全部折叠
             setTimeout(() => {
@@ -1768,15 +1842,94 @@ const getHTMLContent = (title) => `
         
         // 加载所有域名
         async function loadDomains() {
+            console.log('开始加载域名数据');
+            
+            // 先尝试显示加载状态，但不阻止后续操作
             try {
-                const response = await fetch('/api/domains');
-                if (!response.ok) throw new Error('获取域名列表失败');
-                
-                domains = await response.json();
-                renderDomainList();
-            } catch (error) {
-                showAlert('danger', '加载域名列表失败: ' + error.message);
+                showDomainLoadingState();
+            } catch (loadingError) {
+                console.error('显示加载状态失败:', loadingError);
+                // 继续执行，不要因为显示加载状态失败而中断
             }
+            
+            try {
+                console.log('发送API请求获取域名数据');
+                const response = await fetch('/api/domains');
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API响应错误:', response.status, errorText);
+                    throw new Error('获取域名列表失败: ' + response.status);
+                }
+                
+                console.log('API响应成功，解析数据');
+                domains = await response.json();
+                console.log('获取到域名数据:', domains.length, '条记录');
+                
+                // 确保DOM元素已加载后再渲染
+                setTimeout(() => {
+                    console.log('开始渲染域名列表');
+                    renderDomainList();
+                    console.log('域名列表渲染完成');
+                }, 100);
+                
+                return domains; // 返回加载的域名数据
+            } catch (error) {
+                console.error('加载域名数据失败:', error);
+                showAlert('danger', '加载域名列表失败: ' + error.message);
+                throw error; // 重新抛出错误以便Promise.all可以捕获
+            }
+        }
+        
+        // 显示域名加载中的状态
+        function showDomainLoadingState() {
+            console.log('尝试显示加载状态');
+            
+            // 使用document.querySelector作为备选方法
+            const domainListContainer = document.getElementById('domainListContainer') || document.querySelector('#domainListContainer');
+            
+            if (!domainListContainer) {
+                console.error('domainListContainer 元素不存在 - 无法显示加载状态');
+                return;
+            }
+            
+            console.log('找到domainListContainer元素，设置骨架屏');
+            
+            try {
+                // 创建骨架屏
+                domainListContainer.innerHTML = 
+                    '<div class="col-md-6 col-lg-4 domain-column px-1-5">' +
+                        generateSkeletonCard() +
+                        generateSkeletonCard() +
+                    '</div>' +
+                    '<div class="col-md-6 col-lg-4 domain-column px-1-5">' +
+                        generateSkeletonCard() +
+                        generateSkeletonCard() +
+                    '</div>' +
+                    '<div class="col-md-6 col-lg-4 domain-column px-1-5">' +
+                        generateSkeletonCard() +
+                        generateSkeletonCard() +
+                    '</div>';
+                    
+                console.log('骨架屏设置成功');
+            } catch (error) {
+                console.error('设置骨架屏失败:', error);
+            }
+        }
+        
+        // 生成骨架屏卡片
+        function generateSkeletonCard() {
+            return '<div class="domain-card skeleton-card mb-3">' +
+                '<div class="domain-header skeleton-header">' +
+                    '<div class="skeleton-text-lg"></div>' +
+                    '<div class="skeleton-text-sm"></div>' +
+                '</div>' +
+                '<div class="domain-body">' +
+                    '<div class="skeleton-text"></div>' +
+                    '<div class="skeleton-text"></div>' +
+                    '<div class="skeleton-progress"></div>' +
+                '</div>' +
+            '</div>';
         }
         
         // 加载Telegram配置
@@ -1880,7 +2033,7 @@ const getHTMLContent = (title) => `
                 
                 const result = await response.json();
                 testResult.textContent = '测试成功！请检查Telegram是否收到消息';
-                testResult.className = 'ms-2 text-success';
+                testResult.className = 'ms-2 telegram-test-success';
             } catch (error) {
                 testResult.textContent = '测试失败: ' + error.message;
                 testResult.className = 'ms-2 text-danger';
@@ -1889,35 +2042,33 @@ const getHTMLContent = (title) => `
         
         // 渲染域名列表
 function renderDomainList() {
+    // 获取domainListContainer
+    const domainListContainer = document.getElementById('domainListContainer');
+    if (!domainListContainer) {
+        console.error('renderDomainList: domainListContainer 元素不存在');
+        return;
+    }
+    
+    // 确保列结构存在
+    domainListContainer.innerHTML = 
+        '<div class="col-md-6 col-lg-4 domain-column px-1-5" id="column-1"></div>' +
+        '<div class="col-md-6 col-lg-4 domain-column px-1-5" id="column-2"></div>' +
+        '<div class="col-md-6 col-lg-4 domain-column px-1-5" id="column-3"></div>';
+    
     // 获取三个列容器
     const column1 = document.getElementById('column-1');
     const column2 = document.getElementById('column-2');
     const column3 = document.getElementById('column-3');
     
-    // 清空所有列
-    column1.innerHTML = '';
-    column2.innerHTML = '';
-    column3.innerHTML = '';
+    if (!column1 || !column2 || !column3) {
+        console.error('renderDomainList: 列容器元素不存在');
+        return;
+    }
     
     if (domains.length === 0) {
-        // 清除列结构
-        document.getElementById('domainListContainer').innerHTML = '<div class="col-12"><div class="alert alert-info">暂无域名记录，请点击右上角按钮添加域名。</div></div>';
+        // 显示无域名记录提示
+        domainListContainer.innerHTML = '<div class="col-12"><div class="alert alert-info">暂无域名记录，请点击右上角按钮添加域名。</div></div>';
         return;
-    } else {
-                    // 确保列结构存在
-            if (column1 === null || column2 === null || column3 === null) {
-                const domainListContainer = document.getElementById('domainListContainer');
-                domainListContainer.innerHTML = 
-                    '<div class="col-md-6 col-lg-4 domain-column px-1-5" id="column-1"></div>' +
-                    '<div class="col-md-6 col-lg-4 domain-column px-1-5" id="column-2"></div>' +
-                    '<div class="col-md-6 col-lg-4 domain-column px-1-5" id="column-3"></div>';
-            
-            // 重新获取列容器
-            const newColumn1 = document.getElementById('column-1');
-            const newColumn2 = document.getElementById('column-2');
-            const newColumn3 = document.getElementById('column-3');
-            columns = [newColumn1, newColumn2, newColumn3];
-        }
     }
     
     // 获取列容器数组，用于循环分配卡片
