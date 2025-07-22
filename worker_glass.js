@@ -2,8 +2,8 @@
 /*使用KV存储域名信息*/
 
 // iconfont阿里巴巴图标库
-const ICONFONT_CSS = '//at.alicdn.com/t/c/font_4973034_y4ra6tm8jrh.css';
-const ICONFONT_JS = '//at.alicdn.com/t/c/font_4973034_y4ra6tm8jrh.js';
+const ICONFONT_CSS = '//at.alicdn.com/t/c/font_4973034_fdg1q0bn7c5.css';
+const ICONFONT_JS = '//at.alicdn.com/t/c/font_4973034_fdg1q0bn7c5.js';
 
 // 网站图标和背景图片，可在环境变量中设置
 const DEFAULT_LOGO = 'https://imgr2.952536.xyz/Hexo/Article/domain-outline.png'; // 默认Logo图片，外置变量名为LOGO_URL
@@ -16,14 +16,17 @@ const DEFAULT_TOKEN = ''; // 在此处设置默认密码，留空则使用'domai
 const DEFAULT_TG_TOKEN = ''; // 你的Telegram机器人Token，留空则尝试读取环境变量中TG_TOKEN的值
 const DEFAULT_TG_ID = '';    // 你的Telegram聊天ID，留空则尝试读取环境变量中TG_ID的值
 
+// 网站标题配置
+const DEFAULT_TITLE = ''; // 默认网站标题，外置环境变量名为TITLE
+
 // 登录页HTML模板
-const LOGIN_HTML = `
+const getLoginHTML = (title) => `
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>域名到期监控</title>
+    <title>${title}</title>
     <!-- 添加网站图标(favicon) -->
     <link rel="icon" href="${typeof LOGO_URL !== 'undefined' ? LOGO_URL : DEFAULT_LOGO}" type="image/png">
     <link rel="shortcut icon" href="${typeof LOGO_URL !== 'undefined' ? LOGO_URL : DEFAULT_LOGO}" type="image/png">
@@ -118,7 +121,7 @@ const LOGIN_HTML = `
         .login-logo {
             height: 64px;
             width: 64px;
-            margin-right: 8px;
+            margin-right: 0px;
             filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
             vertical-align: middle;
         }
@@ -180,7 +183,7 @@ const LOGIN_HTML = `
         <div style="display: flex; flex-direction: column; align-items: center;">
             <h2 class="login-title">
                 <img src="${typeof LOGO_URL !== 'undefined' ? LOGO_URL : DEFAULT_LOGO}" alt="Logo" class="login-logo">
-                域名到期监控
+                ${title}
             </h2>
             <form id="loginForm" style="width: 100%;">
                 <div class="mb-3">
@@ -197,8 +200,27 @@ const LOGIN_HTML = `
             e.preventDefault();
             const password = document.getElementById('password').value;
             
-            // 直接跳转到密码对应的路径
-            window.location.href = '/' + password;
+            // 使用POST请求验证密码
+            fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ password: password })
+            })
+            .then(response => {
+                if (response.ok) {
+                    // 密码正确，跳转到dashboard页面
+                    window.location.href = '/dashboard';
+                } else {
+                    // 密码错误，显示错误信息
+                    document.getElementById('errorMessage').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('登录请求失败:', error);
+                document.getElementById('errorMessage').style.display = 'block';
+            });
         });
     </script>
 </body>
@@ -206,13 +228,13 @@ const LOGIN_HTML = `
 `;
 
 // HTML模板
-const HTML_CONTENT = `
+const getHTMLContent = (title) => `
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>域名到期监控</title>
+    <title>${title}</title>
     <!-- 添加网站图标(favicon) -->
     <link rel="icon" href="${typeof LOGO_URL !== 'undefined' ? LOGO_URL : DEFAULT_LOGO}" type="image/png">
     <link rel="shortcut icon" href="${typeof LOGO_URL !== 'undefined' ? LOGO_URL : DEFAULT_LOGO}" type="image/png">
@@ -225,7 +247,7 @@ const HTML_CONTENT = `
     <script>
         // 添加登出功能
         function logout() {
-            window.location.href = '/';
+            window.location.href = '/logout';
         }
     </script>
     <style>
@@ -286,12 +308,13 @@ const HTML_CONTENT = `
             color: #ffffff;
             font-size: 1.7rem;
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            gap: 2px; /* 使用gap属性统一控制子元素之间的间距 */
         }
         
         .navbar-brand i {
-            margin-right: 10px;
             font-size: 1.8rem;
             color: white;
+            margin: 0; /* 移除所有margin */
         }
         
         .logo-link {
@@ -454,6 +477,9 @@ const HTML_CONTENT = `
             text-overflow: ellipsis; /* 添加省略号 */
             color: #ffffff;
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            font-size: 1.1rem; /* 设置域名字体大小 */
+            font-weight: 600; /* 加粗字体 */
+            margin-bottom: 0;
         }
         
         .domain-meta {
@@ -751,7 +777,7 @@ const HTML_CONTENT = `
         }
         
         .btn-action:hover {
-            transform: translateY(-2px);
+            /* 移除浮动效果，只保留颜色变化 */
         }
         
         .btn-outline-primary {
@@ -792,6 +818,69 @@ const HTML_CONTENT = `
         .btn-outline-info:hover {
             background-color: var(--info-color);
             color: white;
+        }
+        
+        /* 视图按钮样式 */
+        .view-option {
+            color: rgb(223, 223, 223) !important; /* 未选状态使用灰色文字 */
+            background-color: rgba(204, 204, 204, 0.8) !important; /* 未选状态的背景色 */
+            border-color:rgba(109, 109, 109, 0.3) !important; /* 修改边框颜色 */
+        }
+        
+        .view-option.btn-info {
+            background-color:rgb(255, 255, 255) !important; /* 修改选中状态背景色为蓝色 */
+            color: rgb(31, 34, 39) !important; /* 选中状态使用白色文字 */
+        }
+        
+        .view-option .view-text {
+            font-weight: 500;
+        }
+        
+        /* 添加新域名按钮自定义样式 */
+        .add-domain-btn {
+            background-color:rgb(42, 175, 86) !important; /* 绿色 */
+            border-color:rgba(33, 148, 72, 0.8) !important;
+        }
+        
+        .add-domain-btn:hover {
+            background-color:rgb(24, 216, 120) !important; /* 深绿色 */
+            border-color:rgba(38, 190, 114, 0.8) !important;
+        }
+        
+        /* 排序按钮自定义样式 */
+        .sort-btn {
+            background-color: rgb(0, 123, 255) !important; /* 蓝色 */
+            border-color: rgba(0, 111, 230, 0.8) !important;
+        }
+        
+        .sort-btn:hover {
+            background-color: rgb(0, 162, 255) !important; /* 蓝色 */
+            border-color: rgba(23, 137, 202, 0.8) !important;
+            
+        }
+        
+        /* 排序选项的勾选图标样式 */
+        .sort-check {
+            visibility: hidden;
+            margin-right: 5px;
+            /* 使用与文字相同的颜色 */
+            color: inherit;
+        }
+        
+        .sort-option.active .sort-check {
+            visibility: visible;
+        }
+        
+        /* 排序选项选中状态样式 - 只显示勾符号，不使用背景色 */
+        .sort-option.active {
+            background-color: transparent !important;
+            color: white !important;
+        }
+        
+        /* 确保所有排序选项文字左对齐 */
+        .dropdown-item {
+            display: flex;
+            align-items: center;
         }
         
         /* 添加iconfont图标的通用样式 */
@@ -906,7 +995,7 @@ const HTML_CONTENT = `
         
         .domain-actions .btn:hover,
         .domain-actions a.btn:hover {
-            transform: translateY(-2px);
+            /* 移除浮动效果，只保留颜色变化 */
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
             color: white;
         }
@@ -1032,7 +1121,7 @@ const HTML_CONTENT = `
         /* 确保下拉菜单显示在最上层 */
         .dropdown-menu {
             z-index: 1050 !important;
-            background-color: rgba(30, 30, 30, 0.85) !important; /* 更深的背景色，更高的不透明度 */
+            background-color: rgba(60, 65, 70, 0.75) !important; /* 更浅的背景色 */
             backdrop-filter: blur(15px) !important;
             -webkit-backdrop-filter: blur(15px) !important;
             border: 1px solid rgba(255, 255, 255, 0.25) !important;
@@ -1193,11 +1282,11 @@ const HTML_CONTENT = `
         <!-- 导航栏 -->
         <nav class="navbar">
             <span class="navbar-brand">
-                <a href="/" class="logo-link">
+                <span class="logo-link">
                     <img src="${typeof LOGO_URL !== 'undefined' ? LOGO_URL : DEFAULT_LOGO}" alt="Logo" class="logo-img">
-                </a>
+                </span>
                 <i class="iconfont icon-domain iconfont-lg"></i>
-                <span style="color: white; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">域名到期监控</span>
+                <span style="color: white; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">${title}</span>
             </span>
             <div class="navbar-actions">
                 <button class="btn btn-secondary me-3" data-bs-toggle="modal" data-bs-target="#settingsModal">
@@ -1213,21 +1302,30 @@ const HTML_CONTENT = `
         <div class="page-header">
             <h1 class="page-title"><i class="iconfont icon-list-ul"></i> 域名列表</h1>
             <div class="btn-action-group">
-                <button class="btn btn-primary btn-action" data-bs-toggle="modal" data-bs-target="#addDomainModal">
+                                  <div class="btn-group me-2">
+                      <button class="btn btn-outline-info btn-action view-option" data-view="collapse-all" type="button" style="transition: background-color 0.2s, color 0.2s;">
+                         <i class="iconfont icon-quanjusuoxiao"></i> <span class="view-text">全局折叠</span>
+                      </button>
+                      <button class="btn btn-outline-info btn-action view-option" data-view="expand-all" type="button" style="transition: background-color 0.2s, color 0.2s;">
+                         <i class="iconfont icon-quanjufangda"></i> <span class="view-text">全局展开</span>
+                      </button>
+                  </div>
+                <button class="btn btn-primary btn-action add-domain-btn" data-bs-toggle="modal" data-bs-target="#addDomainModal">
                     <i class="iconfont icon-jia" style="color: white;"></i> <span style="color: white;">添加新域名</span>
                 </button>
                 <div class="dropdown">
-                    <button class="btn btn-danger dropdown-toggle btn-action" type="button" id="sortDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    <button class="btn btn-danger dropdown-toggle btn-action sort-btn" type="button" id="sortDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="iconfont icon-paixu" style="color: white;"></i> <span style="color: white;">按域名升序</span>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="sortDropdown">
-                        <li><a class="dropdown-item sort-option" data-sort="name" data-order="asc" href="#">按域名升序</a></li>
-                        <li><a class="dropdown-item sort-option" data-sort="name" data-order="desc" href="#">按域名降序</a></li>
+                        <li><a class="dropdown-item sort-option" data-sort="name" data-order="asc" href="#"><i class="iconfont icon-gou1 sort-check"></i> 按域名升序</a></li>
+                        <li><a class="dropdown-item sort-option" data-sort="name" data-order="desc" href="#"><i class="iconfont icon-gou1 sort-check"></i> 按域名降序</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item sort-option" data-sort="daysLeft" data-order="asc" href="#">按剩余天数升序</a></li>
-                        <li><a class="dropdown-item sort-option" data-sort="daysLeft" data-order="desc" href="#">按剩余天数降序</a></li>
+                        <li><a class="dropdown-item sort-option" data-sort="daysLeft" data-order="asc" href="#"><i class="iconfont icon-gou1 sort-check"></i> 按剩余天数升序</a></li>
+                        <li><a class="dropdown-item sort-option" data-sort="daysLeft" data-order="desc" href="#"><i class="iconfont icon-gou1 sort-check"></i> 按剩余天数降序</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item sort-option" data-sort="registrar" data-order="asc" href="#">按注册商排序</a></li>
+                        <li><a class="dropdown-item sort-option" data-sort="registrar" data-order="asc" href="#"><i class="iconfont icon-gou1 sort-check"></i> 按注册商升序</a></li>
+                        <li><a class="dropdown-item sort-option" data-sort="registrar" data-order="desc" href="#"><i class="iconfont icon-gou1 sort-check"></i> 按注册商降序</a></li>
                     </ul>
                 </div>
             </div>
@@ -1458,6 +1556,7 @@ const HTML_CONTENT = `
         let telegramConfig = {};
         let currentSortField = 'name'; // 默认排序字段改为域名
         let currentSortOrder = 'asc'; // 默认排序顺序
+        let viewMode = 'auto-collapse'; // 默认查看模式：auto-collapse (自动折叠), expand-all (全部展开), collapse-all (全部折叠)
         
         // 将天数转换为年月日格式
         function formatDaysToYMD(days) {
@@ -1490,6 +1589,15 @@ const HTML_CONTENT = `
             loadDomains();
             loadTelegramConfig();
             setupEventListeners();
+            
+            // 设置初始视图模式为全部折叠
+            setTimeout(() => {
+                const collapseAllButton = document.querySelector('.view-option[data-view="collapse-all"]');
+                if (collapseAllButton) {
+                    collapseAllButton.classList.remove('btn-outline-info');
+                    collapseAllButton.classList.add('btn-info');
+                }
+            }, 500); // 延迟执行确保DOM已经加载完成
         });
         
         // 设置事件监听器
@@ -1539,15 +1647,105 @@ const HTML_CONTENT = `
                     renderDomainList();
                     
                     // 更新排序按钮文本
-                    const sortText = this.textContent;
+                    const sortText = this.textContent.trim();
                     document.getElementById('sortDropdown').innerHTML = '<i class="iconfont icon-paixu"></i> ' + sortText;
+                    
+                    // 更新勾选状态
+                    document.querySelectorAll('.sort-option').forEach(opt => {
+                        opt.classList.remove('active');
+                    });
+                    this.classList.add('active');
                 });
             });
             
-            // 初始加载时设置默认排序按钮文本
+            // 视图模式选项点击事件
+            document.querySelectorAll('.view-option').forEach(option => {
+                option.addEventListener('click', function(e) {
+                    const newViewMode = this.dataset.view;
+                    
+                    // 设置视图模式
+                    viewMode = newViewMode;
+                    
+                    // 直接获取所有卡片详情元素
+                    const allDetails = document.querySelectorAll('.domain-card .collapse');
+                    
+                    // 根据模式直接进行操作
+                    if (newViewMode === 'expand-all') {
+                        console.log('展开所有卡片，共 ' + allDetails.length + ' 个');
+                        
+                        // 直接展开所有卡片
+                        allDetails.forEach(detail => {
+                            // 手动添加show类，强制显示
+                            detail.classList.add('show');
+                            detail.style.height = 'auto'; // 确保内容显示
+                            detail.style.overflow = 'visible';
+                            
+                            // 获取父级卡片
+                            const domainCard = detail.closest('.domain-card');
+                            if (domainCard) {
+                                // 在父级卡片中寻找toggle按钮
+                                const btn = domainCard.querySelector('.toggle-details');
+                                if (btn) {
+                                    btn.classList.remove('collapsed');
+                                    btn.setAttribute('aria-expanded', 'true');
+                                }
+                            }
+                        });
+                        
+                        // 高亮"全部展开"按钮
+                        document.querySelectorAll('.view-option').forEach(btn => {
+                            if (btn.dataset.view === 'expand-all') {
+                                btn.classList.remove('btn-outline-info');
+                                btn.classList.add('btn-info');
+                            } else {
+                                btn.classList.add('btn-outline-info');
+                                btn.classList.remove('btn-info');
+                            }
+                        });
+                    } else if (newViewMode === 'collapse-all' || newViewMode === 'auto-collapse') {
+                        console.log('折叠所有卡片，共 ' + allDetails.length + ' 个');
+                        
+                        // 直接折叠所有卡片
+                        allDetails.forEach(detail => {
+                            // 手动移除show类，强制隐藏
+                            detail.classList.remove('show');
+                            detail.style.height = '0px'; // 强制隐藏高度
+                            detail.style.overflow = 'hidden';
+                            
+                            // 获取父级卡片
+                            const domainCard = detail.closest('.domain-card');
+                            if (domainCard) {
+                                // 在父级卡片中寻找toggle按钮
+                                const btn = domainCard.querySelector('.toggle-details');
+                                if (btn) {
+                                    btn.classList.add('collapsed');
+                                    btn.setAttribute('aria-expanded', 'false');
+                                }
+                            }
+                        });
+                        
+                        // 高亮"全部折叠"按钮
+                        document.querySelectorAll('.view-option').forEach(btn => {
+                            if (btn.dataset.view === 'collapse-all') {
+                                btn.classList.remove('btn-outline-info');
+                                btn.classList.add('btn-info');
+                            } else {
+                                btn.classList.add('btn-outline-info');
+                                btn.classList.remove('btn-info');
+                            }
+                        });
+                    }
+                });
+            });
+            
+            // 初始加载时设置默认排序选项
             const defaultSortOption = document.querySelector('.sort-option[data-sort="' + currentSortField + '"][data-order="' + currentSortOrder + '"]');
             if (defaultSortOption) {
-                document.getElementById('sortDropdown').innerHTML = '<i class="iconfont icon-paixu"></i> ' + defaultSortOption.textContent;
+                // 设置排序按钮文本
+                document.getElementById('sortDropdown').innerHTML = '<i class="iconfont icon-paixu"></i> ' + defaultSortOption.textContent.trim();
+                
+                // 设置默认选项为激活状态
+                defaultSortOption.classList.add('active');
             }
             
             // 表头排序点击事件
@@ -1937,7 +2135,7 @@ function renderDomainList() {
             '<span class="status-dot ' + statusClass + '"></span>' +
             '<div class="domain-header">' +
             '<h5 class="mb-0"><strong>' + domain.name + '</strong></h5>' +
-            (domain.registrationDate ? '<div class="domain-meta">注册于 ' + formatDate(domain.registrationDate) + '</div>' : '') +
+            (domain.registrar ? '<div class="domain-meta">注册商: ' + domain.registrar + '</div>' : '') +
             '</div>' +
             '<div class="domain-status">' +
             '<span class="badge bg-' + statusBadge + '">' + statusText + '</span>' +
@@ -1952,7 +2150,7 @@ function renderDomainList() {
             '<div class="card-body pb-2">' +
             '<div class="d-flex justify-content-between align-items-start mb-2">' +
             '<div class="flex-grow-1">' +
-            (domain.registrar ? '<p class="card-text mb-1"><i class="iconfont icon-house-chimney"></i><strong>注册商:</strong>' + domain.registrar + '</p>' : '') +
+            (domain.registrationDate ? '<p class="card-text mb-1"><i class="iconfont icon-calendar-days"></i><strong>注册时间:</strong>' + formatDate(domain.registrationDate) + '</p>' : '') +
             '<p class="card-text mb-1"><i class="iconfont icon-rili"></i><strong>到期日期:</strong>' + formatDate(domain.expiryDate) + '</p>' +
             '<p class="card-text mb-1"><i class="iconfont icon-repeat"></i><strong>续期周期:</strong>' + 
             (domain.renewCycle ? domain.renewCycle.value + ' ' + 
@@ -2022,53 +2220,185 @@ function renderDomainList() {
         button.addEventListener('click', () => testDomainNotification(button.dataset.id));
     });
     
-    // 添加下拉按钮的事件监听器
+            // 添加下拉按钮的事件监听器
     document.querySelectorAll('.toggle-details').forEach(button => {
         // 不需要额外的JavaScript处理，CSS transition会自动处理动画
-        button.addEventListener('click', function() {
-            // 点击时Bootstrap会自动添加/移除collapsed类，CSS会处理旋转动画
-        });
-    });
-    
-    // 添加点击空白处关闭已展开卡片的功能
-    document.addEventListener('click', function(event) {
-        // 检查点击的元素是否在卡片内部
-        const isClickInsideCard = event.target.closest('.domain-card');
-        const isClickOnToggleButton = event.target.closest('.toggle-details');
-        
-        // 如果点击不在卡片内部或不是点击了切换按钮
-        if (!isClickInsideCard || isClickOnToggleButton) {
-            return;
-        }
-        
-        // 获取所有已展开的卡片详情
-        const expandedDetails = document.querySelectorAll('.collapse.show');
-        
-        // 获取当前点击的卡片中的详情元素
-        const currentCardDetails = isClickInsideCard ? isClickInsideCard.querySelector('.collapse') : null;
-        
-        // 关闭所有不是当前点击卡片的已展开详情
-        expandedDetails.forEach(detail => {
-            if (detail !== currentCardDetails) {
-                // 使用Bootstrap的collapse API关闭
-                bootstrap.Collapse.getInstance(detail)?.hide();
+        button.addEventListener('click', function(e) {
+            // 如果当前是全部展开或全部折叠模式，点击切换按钮会切换到自动折叠模式
+            if (viewMode !== 'auto-collapse') {
+                // 先阻止默认的bootstrap折叠/展开行为
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // 切换到自动折叠模式
+                viewMode = 'auto-collapse';
+                
+                // 更新视图按钮文本
+                document.getElementById('viewStyleDropdown').innerHTML = 
+                    '<i class="iconfont icon-eye"></i> <span style="color: white;">列表样式</span>';
+                
+                // 获取当前按钮对应的卡片详情
+                const collapseTarget = document.querySelector(button.getAttribute('data-bs-target'));
+                
+                // 折叠所有其他卡片
+                document.querySelectorAll('.collapse.show').forEach(detail => {
+                    if (detail !== collapseTarget) {
+                        bootstrap.Collapse.getInstance(detail)?.hide();
+                    }
+                });
+                
+                // 切换当前卡片的状态
+                const collapseInstance = bootstrap.Collapse.getInstance(collapseTarget);
+                if (collapseInstance) {
+                    if (collapseTarget.classList.contains('show')) {
+                        collapseInstance.hide();
+                    } else {
+                        collapseInstance.show();
+                    }
+                }
             }
+            // 在自动折叠模式下，使用默认的bootstrap行为
         });
     });
     
-    // 点击页面空白处关闭所有展开的卡片
+    // 添加点击空白处关闭已展开卡片的功能（仅在自动折叠模式下有效）
     document.addEventListener('click', function(event) {
-        // 如果点击的是页面空白处（不在任何卡片内）
-        if (!event.target.closest('.domain-card') && !event.target.closest('.modal')) {
+        // 只在自动折叠模式下处理
+        if (viewMode === 'auto-collapse') {
+            // 检查点击的元素是否在卡片内部
+            const isClickInsideCard = event.target.closest('.domain-card');
+            const isClickOnToggleButton = event.target.closest('.toggle-details');
+            
+            // 如果点击不在卡片内部或不是点击了切换按钮
+            if (!isClickInsideCard || isClickOnToggleButton) {
+                return;
+            }
+            
             // 获取所有已展开的卡片详情
             const expandedDetails = document.querySelectorAll('.collapse.show');
             
-            // 关闭所有已展开的详情
+            // 获取当前点击的卡片中的详情元素
+            const currentCardDetails = isClickInsideCard ? isClickInsideCard.querySelector('.collapse') : null;
+            
+            // 关闭所有不是当前点击卡片的已展开详情
             expandedDetails.forEach(detail => {
-                bootstrap.Collapse.getInstance(detail)?.hide();
+                if (detail !== currentCardDetails) {
+                    // 使用Bootstrap的collapse API关闭
+                    bootstrap.Collapse.getInstance(detail)?.hide();
+                }
             });
         }
     });
+    
+    // 点击页面空白处关闭所有展开的卡片（仅在自动折叠模式下有效）
+    document.addEventListener('click', function(event) {
+        // 只在自动折叠模式下处理
+        if (viewMode === 'auto-collapse') {
+            // 如果点击的是页面空白处（不在任何卡片内）
+            if (!event.target.closest('.domain-card') && !event.target.closest('.modal')) {
+                // 获取所有已展开的卡片详情
+                const expandedDetails = document.querySelectorAll('.collapse.show');
+                
+                // 关闭所有已展开的详情
+                expandedDetails.forEach(detail => {
+                    bootstrap.Collapse.getInstance(detail)?.hide();
+                });
+            }
+        }
+    });
+    
+    // 处理视图模式更改
+    function handleViewModeChange() {
+        // 获取所有卡片的详情区域
+        const allCardDetails = document.querySelectorAll('.domain-card .collapse');
+        
+        // 根据当前视图模式处理
+        switch (viewMode) {
+            case 'expand-all':
+                // 展开所有卡片 - 使用更直接的方法
+                allCardDetails.forEach(detail => {
+                    // 手动添加show类
+                    detail.classList.add('show');
+                    
+                    // 查找对应的切换按钮
+                    const detailId = detail.id;
+                    const toggleButton = document.querySelector('[data-bs-target="#' + detailId + '"]');
+                    if (toggleButton) {
+                        toggleButton.classList.remove('collapsed');
+                        toggleButton.setAttribute('aria-expanded', 'true');
+                    }
+                    
+                    // 处理父元素
+                    const parentCard = detail.closest('.domain-card');
+                    if (parentCard) {
+                        parentCard.classList.add('expanded');
+                    }
+                });
+                break;
+                
+            case 'collapse-all':
+                // 折叠所有卡片 - 使用更直接的方法
+                allCardDetails.forEach(detail => {
+                    // 手动移除show类
+                    detail.classList.remove('show');
+                    
+                    // 查找对应的切换按钮
+                    const detailId = detail.id;
+                    const toggleButton = document.querySelector('[data-bs-target="#' + detailId + '"]');
+                    if (toggleButton) {
+                        toggleButton.classList.add('collapsed');
+                        toggleButton.setAttribute('aria-expanded', 'false');
+                    }
+                    
+                    // 处理父元素
+                    const parentCard = detail.closest('.domain-card');
+                    if (parentCard) {
+                        parentCard.classList.remove('expanded');
+                    }
+                });
+                break;
+                
+            case 'auto-collapse':
+                // 默认全部折叠，然后用户可以手动展开/折叠
+                allCardDetails.forEach(detail => {
+                    // 手动移除show类
+                    detail.classList.remove('show');
+                    
+                    // 查找对应的切换按钮
+                    const detailId = detail.id;
+                    const toggleButton = document.querySelector('[data-bs-target="#' + detailId + '"]');
+                    if (toggleButton) {
+                        toggleButton.classList.add('collapsed');
+                        toggleButton.setAttribute('aria-expanded', 'false');
+                    }
+                    
+                    // 处理父元素
+                    const parentCard = detail.closest('.domain-card');
+                    if (parentCard) {
+                        parentCard.classList.remove('expanded');
+                    }
+                });
+                break;
+        }
+    }
+    
+    // 确保所有卡片的collapse实例都被正确初始化
+    function initializeAllCollapses() {
+        document.querySelectorAll('.domain-card .collapse').forEach(detail => {
+            // 初始化Collapse实例
+            if (!bootstrap.Collapse.getInstance(detail)) {
+                new bootstrap.Collapse(detail, {
+                    toggle: false
+                });
+            }
+        });
+    }
+
+    // 确保所有卡片的collapse实例都被正确初始化
+    initializeAllCollapses();
+    
+    // 应用当前视图模式
+    handleViewModeChange();
 
     /* 
     // 示例：如何将按钮改为纯图标
@@ -2543,8 +2873,20 @@ async function handleRequest(request) {
   const url = new URL(request.url);
   const path = url.pathname;
   
+  // 获取标题
+  // 优先级：环境变量 > 代码变量 > 默认值'域名到期监控'
+  let siteTitle;
+  if (typeof TITLE !== 'undefined' && TITLE !== '') {
+    // 如果环境变量中有设置，使用环境变量
+    siteTitle = TITLE;
+  } else if (DEFAULT_TITLE !== '') {
+    // 如果环境变量中没有，但代码变量有设置，使用代码变量
+    siteTitle = DEFAULT_TITLE;
+  } else {
+    // 如果环境变量和代码变量都没有设置，使用默认值
+    siteTitle = '域名到期监控';
+  }
 
-  
   // 获取正确的密码
   // 优先级：环境变量 > 代码变量 > 默认密码'domain'
   let correctPassword;
@@ -2561,30 +2903,82 @@ async function handleRequest(request) {
     correctPassword = 'domain';
   }
 
-  // 检查路径是否匹配密码
-  if (path === '/' + correctPassword) {
-    // 密码正确，返回主页面
-    const response = new Response(HTML_CONTENT, {
+  // 检查是否已经登录（通过cookie）
+  const cookieHeader = request.headers.get('Cookie') || '';
+  const isAuthenticated = cookieHeader.includes('auth=true');
+  
+  // 处理登录POST请求
+  if (path === '/login' && request.method === 'POST') {
+    try {
+      const requestData = await request.json();
+      const submittedPassword = requestData.password;
+      
+      if (submittedPassword === correctPassword) {
+        // 密码正确，设置cookie并重定向到dashboard
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Set-Cookie': 'auth=true; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400', // 24小时过期
+          },
+        });
+      } else {
+        // 密码错误
+        return new Response(JSON.stringify({ success: false, error: '密码错误' }), {
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      }
+    } catch (error) {
+      return new Response(JSON.stringify({ success: false, error: '请求格式错误' }), {
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+    }
+  }
+  
+  // 处理dashboard页面请求
+  if (path === '/dashboard') {
+    if (isAuthenticated) {
+      // 已登录，显示主页面
+      const htmlContent = getHTMLContent(siteTitle);
+      const response = new Response(htmlContent, {
+        headers: {
+          'Content-Type': 'text/html;charset=UTF-8',
+        },
+      });
+      
+      return await addFooterToResponse(response);
+    } else {
+      // 未登录，重定向到登录页面
+      return Response.redirect(url.origin, 302);
+    }
+  }
+  
+  // 登出功能
+  if (path === '/logout') {
+    return new Response('登出成功', {
+      status: 302,
       headers: {
-        'Content-Type': 'text/html;charset=UTF-8',
+        'Location': '/',
+        'Set-Cookie': 'auth=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0', // 清除cookie
       },
     });
+  }
+  
+  // 根路径或任何其他路径（除了/api和/dashboard）都显示登录页面
+  if (path === '/' || (!path.startsWith('/api/') && path !== '/dashboard')) {
+    // 如果已登录，重定向到dashboard
+    if (isAuthenticated) {
+      return Response.redirect(`${url.origin}/dashboard`, 302);
+    }
     
-    return await addFooterToResponse(response);
-  }
-  
-  // 根路径或任何其他路径（除了/api和/login）都显示登录页面
-  if (path === '/' || (!path.startsWith('/api/') && path !== '/login')) {
-    return new Response(LOGIN_HTML, {
-      headers: {
-        'Content-Type': 'text/html;charset=UTF-8',
-      },
-    });
-  }
-  
-  // 登录页面
-  if (path === '/login') {
-    return new Response(LOGIN_HTML, {
+    const loginHtml = getLoginHTML(siteTitle);
+    return new Response(loginHtml, {
       headers: {
         'Content-Type': 'text/html;charset=UTF-8',
       },
@@ -2593,32 +2987,17 @@ async function handleRequest(request) {
   
   // API 路由处理
   if (path.startsWith('/api/')) {
-    // 检查请求是否来自正确的路径
-    const referer = request.headers.get('Referer') || '';
-    const refererUrl = new URL(referer, url.origin);
-    
-    // 如果Referer中包含正确的密码路径，则允许API访问
-    // 使用与登录相同的密码逻辑
-    let apiCorrectPassword;
-    if (typeof TOKEN !== 'undefined' && TOKEN !== '') {
-      apiCorrectPassword = TOKEN;
-    } else if (DEFAULT_TOKEN !== '') {
-      apiCorrectPassword = DEFAULT_TOKEN;
-    } else {
-      apiCorrectPassword = 'domain';
+    // 检查是否已登录
+    if (!isAuthenticated) {
+      return jsonResponse({ error: '未授权访问', success: false }, 401);
     }
     
-    const correctPath = '/' + apiCorrectPassword;
-    if (refererUrl.pathname === correctPath) {
-      return await handleApiRequest(request);
-    }
-    
-    // 否则拒绝访问
-    return jsonResponse({ error: '未授权访问', success: false }, 401);
+    return await handleApiRequest(request);
   }
   
   // 如果都不匹配，返回登录页面
-  return new Response(LOGIN_HTML, {
+  const loginHtml = getLoginHTML(siteTitle);
+  return new Response(loginHtml, {
     headers: {
       'Content-Type': 'text/html;charset=UTF-8',
     },
