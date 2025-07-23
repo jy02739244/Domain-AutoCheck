@@ -333,6 +333,18 @@ const getHTMLContent = (title) => `
         
         .logo-img:hover {
             transform: scale(1.1);
+            cursor: pointer;
+            filter: brightness(1.2);
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .logo-img.refreshing {
+            animation: pulse 0.8s ease-in-out;
         }
         
         .navbar-actions {
@@ -428,10 +440,14 @@ const getHTMLContent = (title) => `
             -webkit-backdrop-filter: blur(15px);
         }
         
+        /* ===== 卡片头部样式 - 开始 ===== */
+        /* 卡片头部容器 */
         .card-header {
             background-color: rgba(255, 255, 255, 0.1);
             border-bottom: 1px solid rgba(255, 255, 255, 0.18);
-            padding: 15px 20px;
+            padding: 15px 0; /* 移除左右内边距，改为在各元素上单独控制 */
+            padding-top: 12px;
+            padding-bottom: 12px;
             position: relative;
             display: flex;
             align-items: center;
@@ -439,29 +455,37 @@ const getHTMLContent = (title) => `
             overflow: hidden; /* 防止内容溢出 */
             border-top-left-radius: 16px;
             border-top-right-radius: 16px;
-            gap: 5px; /* 添加间距 */
+            gap: 0; /* 移除间距，改为在各元素上单独控制 */
         }
         
-        .card-body .d-flex {
-            margin-right: 0;
-            padding-right: 0;
-            overflow: visible !important;
+        /* 状态指示圆点 */
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 10px; /* 与域名文字的间距 */
+            margin-left: 20px; /* 与卡片左边的间距 */
+            vertical-align: middle;
+            flex-shrink: 0;
         }
         
-        /* 移除单独的百分比值样式，改为直接在SVG中使用text元素 */
-        
-        .card-header,
-        .card-body {
-            padding-left: 20px;
-            padding-right: 20px;
-            position: relative;
+        .status-dot.expired {
+            background-color: var(--danger-color);
+            box-shadow: 0 0 5px var(--danger-color);
         }
         
-        .card-header {
-            padding-top: 12px;
-            padding-bottom: 12px;
+        .status-dot.warning {
+            background-color: var(--warning-color);
+            box-shadow: 0 0 5px var(--warning-color);
         }
         
+        .status-dot.safe {
+            background-color: var(--success-color);
+            box-shadow: 0 0 5px var(--success-color);
+        }
+        
+        /* 域名标题区域 */
         .domain-header {
             display: flex;
             flex-direction: column;
@@ -469,6 +493,8 @@ const getHTMLContent = (title) => `
             flex: 1;
             min-width: 0; /* 解决flex子项目溢出问题 */
             overflow: hidden; /* 确保内容不会溢出 */
+            padding-left: 5px; /* 与小圆点的间距 */
+            transition: all 0.3s ease; /* 添加过渡效果 */
         }
         
         .domain-header h5 {
@@ -480,6 +506,14 @@ const getHTMLContent = (title) => `
             font-size: 1.1rem; /* 设置域名字体大小 */
             font-weight: 600; /* 加粗字体 */
             margin-bottom: 0;
+            transition: white-space 0.3s ease; /* 添加过渡效果 */
+        }
+        
+        /* 展开状态下的域名显示 */
+        .domain-card.expanded .domain-header h5 {
+            white-space: normal; /* 允许换行 */
+            word-wrap: break-word; /* 确保长单词也能换行 */
+            word-break: break-all; /* 在任何字符间换行 */
         }
         
         .domain-meta {
@@ -487,6 +521,95 @@ const getHTMLContent = (title) => `
             color: rgba(255, 255, 255, 0.8);
             margin-top: 3px;
         }
+        
+        /* 状态区域 */
+        .domain-status {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            flex-shrink: 0; /* 防止被压缩 */
+            min-width: 120px; /* 设置最小宽度 */
+            padding-right: 20px; /* 下拉按钮与卡片右边的间距 */
+        }
+        
+        .domain-status .badge {
+            margin-right: 10px; /* 与下拉箭头的间距 */
+            white-space: nowrap; /* 确保标签文本不换行 */
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: 500;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+        
+        .badge .iconfont {
+            margin-right: 3px;
+            font-size: 0.9rem;
+            vertical-align: middle;
+            color: white;
+        }
+        
+        /* 下拉按钮 */
+        .toggle-details {
+            padding: 0;
+            margin-left: 0; /* 与状态标签的间距 */
+            color: white;
+            background: none;
+            border: none;
+            box-shadow: none;
+            position: relative;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            text-decoration: none !important;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+        
+        .toggle-details:hover {
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        /* 图标容器 */
+        .toggle-icon-container {
+            position: relative;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden; /* 防止内容溢出 */
+            line-height: 1;
+        }
+        
+        /* 箭头图标 */
+        .toggle-icon {
+            font-size: 16px;
+            transition: transform 0.3s ease;
+            margin-right: 0 !important; /* 覆盖默认的margin-right */
+            display: block;
+            line-height: 1;
+        }
+        /* ===== 卡片头部样式 - 结束 ===== */
+        
+        .card-body .d-flex {
+            margin-right: 0;
+            padding-right: 0;
+            overflow: visible !important;
+        }
+        
+        /* 移除单独的百分比值样式，改为直接在SVG中使用text元素 */
+        
+        .card-header,
+        .card-body {
+            padding-left: 0; /* 移除左内边距 */
+            padding-right: 0; /* 移除右内边距 */
+            position: relative;
+        }
+        
+        /* 卡片头部相关样式已移至上方统一管理区域 */
         
         /* 骨架屏样式 */
         .skeleton-card {
@@ -552,18 +675,7 @@ const getHTMLContent = (title) => `
             font-weight: 500;
         }
         
-        .domain-status {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            flex-shrink: 0; /* 防止被压缩 */
-            min-width: 120px; /* 设置最小宽度 */
-        }
-        
-        .domain-status .badge {
-            margin-right: 10px;
-            white-space: nowrap; /* 确保标签文本不换行 */
-        }
+        /* 状态区域样式已移至上方统一管理区域 */
         
         .progress-circle-container {
             display: flex;
@@ -650,6 +762,8 @@ const getHTMLContent = (title) => `
         
         .card-body {
             padding: 12px 15px;
+            padding-left: 20px; /* 恢复卡片内容的左内边距 */
+            padding-right: 20px; /* 恢复卡片内容的右内边距 */
             overflow: visible !important;
         }
         
@@ -692,31 +806,7 @@ const getHTMLContent = (title) => `
             flex-direction: column;
         }
         
-        /* 添加状态指示圆点样式 */
-        .status-dot {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            margin-right: 10px;
-            vertical-align: middle;
-            flex-shrink: 0;
-        }
-        
-        .status-dot.expired {
-            background-color: var(--danger-color);
-            box-shadow: 0 0 5px var(--danger-color);
-        }
-        
-        .status-dot.warning {
-            background-color: var(--warning-color);
-            box-shadow: 0 0 5px var(--warning-color);
-        }
-        
-        .status-dot.safe {
-            background-color: var(--success-color);
-            box-shadow: 0 0 5px var(--success-color);
-        }
+        /* 状态指示圆点样式已移至上方统一管理区域 */
         
         /* 域名卡片容器样式 */
         .domain-card-container {
@@ -726,64 +816,9 @@ const getHTMLContent = (title) => `
             overflow: hidden; /* 防止内容溢出 */
         }
         
-        .badge {
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-weight: 500;
-            color: white;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-        }
+        /* Badge样式已移至上方统一管理区域 */
         
-        .badge .iconfont {
-            margin-right: 3px;
-            font-size: 0.9rem;
-            vertical-align: middle;
-            color: white;
-        }
-        
-        /* 下拉按钮样式 */
-        .toggle-details {
-            padding: 0;
-            margin-left: 5px;
-            color: white;
-            background: none;
-            border: none;
-            box-shadow: none;
-            position: relative;
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            line-height: 1;
-            text-decoration: none !important;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-        }
-        
-        .toggle-details:hover {
-            color: rgba(255, 255, 255, 0.8);
-        }
-        
-        /* 图标容器样式 */
-        .toggle-icon-container {
-            position: relative;
-            width: 16px;
-            height: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden; /* 防止内容溢出 */
-            line-height: 1;
-        }
-        
-        /* 箭头图标样式 */
-        .toggle-icon {
-            font-size: 16px;
-            transition: transform 0.3s ease;
-            margin-right: 0 !important; /* 覆盖默认的margin-right */
-            display: block;
-            line-height: 1;
-        }
+        /* 下拉按钮相关样式已移至上方统一管理区域 */
         
         /* 当展开时旋转箭头 */
         .toggle-details:not(.collapsed) .toggle-icon {
@@ -1346,9 +1381,9 @@ const getHTMLContent = (title) => `
         <!-- 导航栏 -->
         <nav class="navbar">
             <span class="navbar-brand">
-                <span class="logo-link">
-                    <img src="${typeof LOGO_URL !== 'undefined' ? LOGO_URL : DEFAULT_LOGO}" alt="Logo" class="logo-img">
-                </span>
+                            <a href="javascript:void(0);" class="logo-link" id="refreshLogo" title="点击刷新页面">
+                <img src="${typeof LOGO_URL !== 'undefined' ? LOGO_URL : DEFAULT_LOGO}" alt="Logo" class="logo-img">
+            </a>
                 <i class="iconfont icon-domain iconfont-lg"></i>
                 <span style="color: white; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">${title}</span>
             </span>
@@ -1368,14 +1403,14 @@ const getHTMLContent = (title) => `
             <div class="btn-action-group">
                                   <div class="btn-group me-2">
                       <button class="btn btn-outline-info btn-action view-option" data-view="collapse-all" type="button" style="transition: background-color 0.2s, color 0.2s;">
-                         <i class="iconfont icon-quanjusuoxiao"></i> <span class="view-text">全局折叠</span>
+                         <i class="iconfont icon-quanjusuoxiao"></i> <span class="view-text">折叠</span>
                       </button>
                       <button class="btn btn-outline-info btn-action view-option" data-view="expand-all" type="button" style="transition: background-color 0.2s, color 0.2s;">
-                         <i class="iconfont icon-quanjufangda"></i> <span class="view-text">全局展开</span>
+                         <i class="iconfont icon-quanjufangda"></i> <span class="view-text">展开</span>
                       </button>
                   </div>
                 <button class="btn btn-primary btn-action add-domain-btn" data-bs-toggle="modal" data-bs-target="#addDomainModal">
-                    <i class="iconfont icon-jia" style="color: white;"></i> <span style="color: white;">添加新域名</span>
+                    <i class="iconfont icon-jia" style="color: white;"></i> <span style="color: white;">添加域名</span>
                 </button>
                 <div class="dropdown">
                     <button class="btn btn-danger dropdown-toggle btn-action sort-btn" type="button" id="sortDropdown" data-bs-toggle="dropdown" aria-expanded="false">
@@ -1676,6 +1711,18 @@ const getHTMLContent = (title) => `
         
         // 设置事件监听器
         function setupEventListeners() {
+            // Logo点击刷新页面
+            document.getElementById('refreshLogo').addEventListener('click', function() {
+                // 添加刷新动画效果
+                const logoImg = this.querySelector('.logo-img');
+                logoImg.classList.add('refreshing');
+                
+                // 延迟刷新页面，让用户看到动画效果
+                setTimeout(() => {
+                    window.location.reload();
+                }, 300);
+            });
+            
             // 保存域名按钮
             document.getElementById('saveDomainBtn').addEventListener('click', saveDomain);
             
@@ -1763,6 +1810,8 @@ const getHTMLContent = (title) => `
                                     btn.classList.remove('collapsed');
                                     btn.setAttribute('aria-expanded', 'true');
                                 }
+                                // 添加展开状态类，使域名可以换行显示
+                                domainCard.classList.add('expanded');
                             }
                         });
                         
@@ -1795,6 +1844,8 @@ const getHTMLContent = (title) => `
                                     btn.classList.add('collapsed');
                                     btn.setAttribute('aria-expanded', 'false');
                                 }
+                                // 移除展开状态类，恢复省略号显示
+                                domainCard.classList.remove('expanded');
                             }
                         });
                         
@@ -2375,8 +2426,9 @@ function renderDomainList() {
     document.querySelectorAll('.toggle-details').forEach(button => {
         // 不需要额外的JavaScript处理，CSS transition会自动处理动画
         button.addEventListener('click', function(e) {
-            // 如果当前是全部展开或全部折叠模式，点击切换按钮会切换到自动折叠模式
-            if (viewMode !== 'auto-collapse') {
+            // 如果当前是全部折叠模式，点击切换按钮会切换到自动折叠模式
+            // 但如果是全部展开模式，则保持该模式
+            if (viewMode === 'collapse-all') {
                 // 先阻止默认的bootstrap折叠/展开行为
                 e.preventDefault();
                 e.stopPropagation();
@@ -2407,6 +2459,21 @@ function renderDomainList() {
                         collapseInstance.show();
                     }
                 }
+            } else if (viewMode === 'expand-all') {
+                // 在全部展开模式下，只处理折叠操作，不改变viewMode
+                const collapseTarget = document.querySelector(button.getAttribute('data-bs-target'));
+                const collapseInstance = bootstrap.Collapse.getInstance(collapseTarget);
+                
+                // 只有当用户尝试折叠卡片时才处理
+                if (collapseTarget.classList.contains('show')) {
+                    // 先阻止默认的bootstrap折叠行为
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // 手动折叠当前卡片
+                    collapseInstance?.hide();
+                }
+                // 如果是尝试展开一个已折叠的卡片，使用默认行为
             }
             // 在自动折叠模式下，使用默认的bootstrap行为
         });
@@ -2414,7 +2481,7 @@ function renderDomainList() {
     
     // 添加点击空白处关闭已展开卡片的功能（仅在自动折叠模式下有效）
     document.addEventListener('click', function(event) {
-        // 只在自动折叠模式下处理
+        // 只在自动折叠模式下处理，在expand-all模式下不自动折叠
         if (viewMode === 'auto-collapse') {
             // 检查点击的元素是否在卡片内部
             const isClickInsideCard = event.target.closest('.domain-card');
@@ -2443,10 +2510,10 @@ function renderDomainList() {
     
     // 点击页面空白处关闭所有展开的卡片（仅在自动折叠模式下有效）
     document.addEventListener('click', function(event) {
-        // 只在自动折叠模式下处理
+        // 只在自动折叠模式下处理，在expand-all模式下不自动折叠
         if (viewMode === 'auto-collapse') {
             // 如果点击的是页面空白处（不在任何卡片内）
-            if (!event.target.closest('.domain-card') && !event.target.closest('.modal')) {
+            if (!event.target.closest('.domain-card') && !event.target.closest('.modal') && !event.target.closest('.btn-action')) {
                 // 获取所有已展开的卡片详情
                 const expandedDetails = document.querySelectorAll('.collapse.show');
                 
@@ -2541,6 +2608,29 @@ function renderDomainList() {
                 new bootstrap.Collapse(detail, {
                     toggle: false
                 });
+            }
+            
+            // 为每个collapse元素添加事件监听，处理域名显示
+            detail.addEventListener('show.bs.collapse', function() {
+                const parentCard = detail.closest('.domain-card');
+                if (parentCard) {
+                    // 添加展开状态类，使域名可以换行显示
+                    parentCard.classList.add('expanded');
+                }
+            });
+            
+            detail.addEventListener('hide.bs.collapse', function() {
+                const parentCard = detail.closest('.domain-card');
+                if (parentCard) {
+                    // 移除展开状态类，恢复省略号显示
+                    parentCard.classList.remove('expanded');
+                }
+            });
+            
+            // 确保初始状态正确
+            const parentCard = detail.closest('.domain-card');
+            if (parentCard && detail.classList.contains('show')) {
+                parentCard.classList.add('expanded');
             }
         });
     }
