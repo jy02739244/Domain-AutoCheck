@@ -7,7 +7,7 @@ const ICONFONT_JS = '//at.alicdn.com/t/c/font_4973034_ehjc2dhuu76.js';
 
 // 网站图标和背景图片，可在环境变量中设置
 const DEFAULT_LOGO = 'https://imgr2.952536.xyz/Hexo/Article/domain-outline.png'; // 默认Logo图片，外置变量名为LOGO_URL
-const DEFAULT_BACKGROUND = 'https://imgr2.952536.xyz/Hexo/Wallpaper/sea-station.png'; // 默认背景图片，外置变量名为BACKGROUND_URL
+const DEFAULT_BACKGROUND = 'https://nzr2.952536.xyz/Cover/bujidao-street.png'; // 默认背景图片，外置变量名为BACKGROUND_URL
 
 // 登录密码设置
 const DEFAULT_TOKEN = ''; // 在此处设置默认密码，留空则使用'domain'，外置变量名为TOKEN
@@ -17,7 +17,7 @@ const DEFAULT_TG_TOKEN = ''; // 你的Telegram机器人Token，留空则尝试�
 const DEFAULT_TG_ID = '';    // 你的Telegram聊天ID，留空则尝试读取环境变量中TG_ID的值
 
 // 网站标题配置
-const DEFAULT_TITLE = ''; // 默认网站标题，外置环境变量名为TITLE
+const DEFAULT_SITE_NAME = ''; // 默认网站标题，外置环境变量名为SITE_NAME
 
 // 登录页HTML模板
 const getLoginHTML = (title) => `
@@ -59,7 +59,7 @@ const getLoginHTML = (title) => `
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: rgba(0, 0, 0, 0.4);
+            background-color: rgba(0, 0, 0, 0.4); /* 这里调整登录界面背景图的黑色蒙版不透明度 */
             z-index: 1;
         }
         
@@ -113,15 +113,18 @@ const getLoginHTML = (title) => `
             font-weight: 600;
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: center; /* 保持居中 */
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-            margin-left: auto;
+            margin-left: 0; /* 保留无左边距 */
             margin-right: auto;
+            width: 100%;
+            padding-left: 0; /* 完全移除左内边距 */
+            margin-right: 8px; /* 添加右边距以平衡 */
         }
         .login-logo {
             height: 64px;
             width: 64px;
-            margin-right: 0px;
+            margin-right: 0px; /* 控制logo和标题文字之间的间距 */
             filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
             vertical-align: middle;
         }
@@ -176,14 +179,14 @@ const getLoginHTML = (title) => `
     </style>
 </head>
 <body>
-    <a href="https://github.com/kamanfaiz" target="_blank" class="github-corner" title="GitHub Repository">
+    <a href="https://github.com/kamanfaiz/CF-Domain-Autocheck" target="_blank" class="github-corner" title="GitHub Repository">
         <i class="iconfont icon-github1"></i>
     </a>
     <div class="login-container">
-        <div style="display: flex; flex-direction: column; align-items: center;">
+        <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
             <h2 class="login-title">
                 <img src="${typeof LOGO_URL !== 'undefined' ? LOGO_URL : DEFAULT_LOGO}" alt="Logo" class="login-logo">
-                ${title}
+                <span>${title}</span>
             </h2>
             <form id="loginForm" style="width: 100%;">
                 <div class="mb-3">
@@ -260,6 +263,8 @@ const getHTMLContent = (title) => `
             --info-color: #17a2b8;
             --light-color: #f8f9fa;
             --dark-color: #343a40;
+            --domain-note-spacing: 2px; /* 域名和备注标签之间的间距 */
+            --domain-line-height: 1.15; /* 域名换行后的行高 */
         }
         
         body {
@@ -281,7 +286,7 @@ const getHTMLContent = (title) => `
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: rgba(0, 0, 0, 0.4);
+            background-color: rgba(0, 0, 0, 0.55); /* 这里调整登录后界面背景图的黑色蒙版不透明度 */
             z-index: 0;
         }
         
@@ -456,6 +461,10 @@ const getHTMLContent = (title) => `
             border-top-left-radius: 16px;
             border-top-right-radius: 16px;
             gap: 0; /* 移除间距，改为在各元素上单独控制 */
+            min-height: 84px; /* 最小高度 */
+            height: auto; /* 自动调整高度以适应内容 */
+            max-height: 140px; /* 最大高度限制 */
+            box-sizing: border-box; /* 确保padding不会增加元素高度 */
         }
         
         /* 状态指示圆点 */
@@ -495,6 +504,9 @@ const getHTMLContent = (title) => `
             overflow: hidden; /* 确保内容不会溢出 */
             padding-left: 5px; /* 与小圆点的间距 */
             transition: all 0.3s ease; /* 添加过渡效果 */
+            min-height: 60px; /* 最小高度，可根据内容自动增加 */
+            height: auto; /* 自动调整高度以适应内容 */
+            max-height: 120px; /* 设置最大高度限制 */
         }
         
         .domain-header h5 {
@@ -503,10 +515,11 @@ const getHTMLContent = (title) => `
             text-overflow: ellipsis; /* 添加省略号 */
             color: #ffffff;
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-            font-size: 1.1rem; /* 设置域名字体大小 */
+            font-size: 1.25rem; /* 设置域名字体大小 */
             font-weight: 600; /* 加粗字体 */
-            margin-bottom: 0;
             transition: white-space 0.3s ease; /* 添加过渡效果 */
+            margin: 0; /* 重置所有margin */
+            line-height: 1.5;
         }
         
         /* 展开状态下的域名显示 */
@@ -516,10 +529,106 @@ const getHTMLContent = (title) => `
             word-break: break-all; /* 在任何字符间换行 */
         }
         
-        .domain-meta {
+        /* 域名容器样式 */
+        .domain-name-container {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* 域名标题样式 */
+        .domain-title {
+            display: inline-block;
+            margin-bottom: 0; /* 确保没有额外的底部边距 */
+        }
+        
+        /* 备注标签样式 */
+        .domain-header .domain-meta {
             font-size: 0.75rem;
             color: rgba(255, 255, 255, 0.8);
-            margin-top: 3px;
+            line-height: 1.2;
+        }
+        
+        /* 展开状态下的域名显示 */
+        .domain-card.expanded .domain-title {
+            display: block; /* 确保域名可以正常换行 */
+        }
+        
+        /* 域名文字样式 */
+        .domain-text {
+            display: inline;
+        }
+        
+        /* 展开状态下域名文字样式 */
+        .domain-card.expanded .domain-title .domain-text {
+            display: inline-block;
+            line-height: var(--domain-line-height); /* 控制行高，即行间距 */
+        }
+        
+        /* 确保展开状态下域名文字能够正确换行 */
+        .domain-card.expanded .domain-title {
+            word-break: break-all;
+            word-wrap: break-word;
+        }
+        
+        /* 间隔元素样式 */
+        .spacer {
+            display: block;
+            width: 100%;
+            /* 高度由内联样式通过CSS变量控制 */
+            flex-shrink: 0; /* 防止被压缩 */
+        }
+        
+        /* 自定义备注样式 - 多种颜色标签风格 */
+        .domain-meta .text-info, .domain-meta [class*="tag-"], .note-preview {
+            background-color: #3B82F6; /* 默认蓝色 */
+            color: white !important;
+            font-weight: 500;
+            padding: 3px 12px;
+            border-radius: 16px;
+            display: inline-block;
+            font-size: 0.8rem;
+            box-shadow: 0 1px 3px rgba(59, 130, 246, 0.3);
+            letter-spacing: 0.2px;
+        }
+        
+        /* 自定义备注颜色类 - 只修改颜色，保留原有样式 */
+        .text-info.tag-blue { background-color: #3B82F6 !important; box-shadow: 0 1px 3px rgba(59, 130, 246, 0.3) !important; }
+        .text-info.tag-green { background-color: #10B981 !important; box-shadow: 0 1px 3px rgba(16, 185, 129, 0.3) !important; }
+        .text-info.tag-red { background-color: #EF4444 !important; box-shadow: 0 1px 3px rgba(239, 68, 68, 0.3) !important; }
+        .text-info.tag-yellow { background-color: #F59E0B !important; box-shadow: 0 1px 3px rgba(245, 158, 11, 0.3) !important; }
+        .text-info.tag-purple { background-color: #8B5CF6 !important; box-shadow: 0 1px 3px rgba(139, 92, 246, 0.3) !important; }
+        .text-info.tag-pink { background-color: #EC4899 !important; box-shadow: 0 1px 3px rgba(236, 72, 153, 0.3) !important; }
+        .text-info.tag-indigo { background-color: #6366F1 !important; box-shadow: 0 1px 3px rgba(99, 102, 241, 0.3) !important; }
+        .text-info.tag-gray { background-color: #6B7280 !important; box-shadow: 0 1px 3px rgba(107, 114, 128, 0.3) !important; }
+        
+        /* 分类容器样式 */
+        .domain-group-container {
+            margin-bottom: 4px; /* 分类之间的间距 */
+        }
+        
+        /* 确保分类标题与卡片左对齐 */
+        .col-12.px-1-5 {
+            padding-left: 0.375rem !important; /* 与卡片列相同的左内边距 */
+        }
+        
+        /* 分类标题样式 */
+        .category-header {
+            padding: 8px 0; /* 移除左右内边距 */
+            margin-bottom: 2px; /* 分类标题和卡片的间距 */
+            margin-left: 10px; /* 增加左边距，使文字与卡片对齐 */
+            display: block; /* 改为块级元素，确保宽度占满 */
+            min-width: 120px;
+        }
+        
+        .category-title {
+            margin: 0;
+            padding: 0;
+            color: white;
+            font-size: 1.8rem;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
         }
         
         /* 状态区域 */
@@ -684,8 +793,11 @@ const getHTMLContent = (title) => `
             padding-right: 10px;
             box-sizing: border-box;
             overflow: visible;
-            position: relative;
-            z-index: 5; /* 降低z-index值 */
+            position: absolute;
+            right: 0;
+            top: 35%; /* 进度条向上移动 */
+            transform: translateY(-50%);
+            z-index: 10; /* 提高z-index值确保在文本上方 */
             min-width: 65px;
         }
         
@@ -1129,6 +1241,11 @@ const getHTMLContent = (title) => `
             border-color: rgba(47, 196, 81, 0.3);
         }
         
+        /* 自定义状态标签颜色 */
+        .bg-success {
+            background-color: rgba(42, 165, 93, 0.8) !important;
+        }
+        
         .btn-info, .btn-outline-info {
             background-color: rgba(23, 162, 184, 0.7);
             border-color: rgba(23, 162, 184, 0.3);
@@ -1174,6 +1291,9 @@ const getHTMLContent = (title) => `
             display: flex;
             align-items: center;
             padding-left: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .card-text strong {
@@ -1414,7 +1534,7 @@ const getHTMLContent = (title) => `
                 </button>
                 <div class="dropdown">
                     <button class="btn btn-danger dropdown-toggle btn-action sort-btn" type="button" id="sortDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="iconfont icon-paixu" style="color: white;"></i> <span style="color: white;">按域名升序</span>
+                        <i class="iconfont icon-paixu" style="color: white;"></i> <span style="color: white;">域名排序</span>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="sortDropdown">
                         <li><a class="dropdown-item sort-option" data-sort="name" data-order="asc" href="#"><i class="iconfont icon-gou1 sort-check"></i> 按域名升序</a></li>
@@ -1423,8 +1543,8 @@ const getHTMLContent = (title) => `
                         <li><a class="dropdown-item sort-option" data-sort="daysLeft" data-order="asc" href="#"><i class="iconfont icon-gou1 sort-check"></i> 按剩余天数升序</a></li>
                         <li><a class="dropdown-item sort-option" data-sort="daysLeft" data-order="desc" href="#"><i class="iconfont icon-gou1 sort-check"></i> 按剩余天数降序</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item sort-option" data-sort="registrar" data-order="asc" href="#"><i class="iconfont icon-gou1 sort-check"></i> 按注册商升序</a></li>
-                        <li><a class="dropdown-item sort-option" data-sort="registrar" data-order="desc" href="#"><i class="iconfont icon-gou1 sort-check"></i> 按注册商降序</a></li>
+                        <li><a class="dropdown-item sort-option" data-sort="customNote" data-order="asc" href="#"><i class="iconfont icon-gou1 sort-check"></i> 按备注升序</a></li>
+                        <li><a class="dropdown-item sort-option" data-sort="customNote" data-order="desc" href="#"><i class="iconfont icon-gou1 sort-check"></i> 按备注降序</a></li>
                     </ul>
                 </div>
             </div>
@@ -1451,11 +1571,32 @@ const getHTMLContent = (title) => `
                         <input type="hidden" id="domainId" value="">
                         <div class="mb-3">
                             <label for="domainName" class="form-label"><i class="iconfont icon-earth-full"></i> 域名</label>
-                            <input type="text" class="form-control" id="domainName" required>
+                            <input type="text" class="form-control" id="domainName" placeholder="请输入域名，如example.com" required>
                         </div>
                         <div class="mb-3">
                             <label for="registrar" class="form-label"><i class="iconfont icon-house-chimney"></i> 注册商</label>
-                            <input type="text" class="form-control" id="registrar">
+                            <input type="text" class="form-control" id="registrar" placeholder="请输入注册商名称，如阿里云、腾讯云等">
+                        </div>
+                        <!-- 添加自定义备注字段 -->
+                        <div class="mb-3">
+                            <label for="customNote" class="form-label"><i class="iconfont icon-tags"></i> 自定义备注</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="customNote" placeholder="添加备注信息">
+                                <select class="form-select" id="noteColor" style="max-width: 120px;">
+                                    <option value="tag-blue" selected>蓝色</option>
+                                    <option value="tag-green">绿色</option>
+                                    <option value="tag-red">红色</option>
+                                    <option value="tag-yellow">黄色</option>
+                                    <option value="tag-purple">紫色</option>
+                                    <option value="tag-pink">粉色</option>
+                                    <option value="tag-indigo">靛蓝</option>
+                                    <option value="tag-gray">灰色</option>
+                                </select>
+                            </div>
+                            <div class="form-text d-flex align-items-center justify-content-between">
+                                <span>将显示在卡片头部域名下方（可选）</span>
+                                <div id="notePreview" style="display: none;" class="text-info note-preview">预览</div>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label for="registrationDate" class="form-label"><i class="iconfont icon-calendar-days"></i> 注册时间</label>
@@ -1732,6 +1873,11 @@ const getHTMLContent = (title) => `
             // 确认续期按钮
             document.getElementById('confirmRenewBtn').addEventListener('click', renewDomain);
             
+            // 添加域名按钮点击事件 - 清空表单
+            document.querySelector('.add-domain-btn').addEventListener('click', function() {
+                resetForm(); // 重置表单，确保显示空白表单
+            });
+            
             // 清除上次续期时间按钮
             document.getElementById('clearLastRenewed').addEventListener('click', function() {
                 document.getElementById('lastRenewed').value = '';
@@ -1759,6 +1905,48 @@ const getHTMLContent = (title) => `
                 document.getElementById('domainNotifySettings').style.display = this.checked ? 'none' : 'block';
             });
             
+            // 自定义备注颜色预览
+            function updateNotePreview() {
+                const noteText = document.getElementById('customNote').value.trim();
+                const noteColor = document.getElementById('noteColor').value;
+                const notePreview = document.getElementById('notePreview');
+                
+                if (noteText) {
+                    // 更新预览文字和显示状态
+                    notePreview.textContent = noteText;
+                    notePreview.style.display = 'inline-block';
+                    
+                    // 移除所有颜色类但保留基本样式
+                    notePreview.className = 'text-info note-preview';
+                    // 添加选中的颜色类
+                    notePreview.classList.add(noteColor);
+                    
+                    // 使用内联样式强制设置颜色
+                    const colorMap = {
+                        'tag-blue': '#3B82F6',
+                        'tag-green': '#10B981',
+                        'tag-red': '#EF4444',
+                        'tag-yellow': '#F59E0B',
+                        'tag-purple': '#8B5CF6',
+                        'tag-pink': '#EC4899',
+                        'tag-indigo': '#6366F1',
+                        'tag-gray': '#6B7280'
+                    };
+                    notePreview.style.backgroundColor = colorMap[noteColor] || '#3B82F6';
+                } else {
+                    notePreview.style.display = 'none';
+                }
+            }
+            
+            // 监听备注文本和颜色变化
+            document.getElementById('customNote').addEventListener('input', updateNotePreview);
+            document.getElementById('noteColor').addEventListener('change', updateNotePreview);
+            
+            // 当模态框显示时初始化预览
+            document.getElementById('addDomainModal').addEventListener('shown.bs.modal', function() {
+                updateNotePreview();
+            });
+            
             // 排序选项点击事件
             document.querySelectorAll('.sort-option').forEach(option => {
                 option.addEventListener('click', function(e) {
@@ -1767,9 +1955,8 @@ const getHTMLContent = (title) => `
                     currentSortOrder = this.dataset.order;
                     renderDomainList();
                     
-                    // 更新排序按钮文本
-                    const sortText = this.textContent.trim();
-                    document.getElementById('sortDropdown').innerHTML = '<i class="iconfont icon-paixu"></i> ' + sortText;
+                                // 不再更新排序按钮文本，只保留"域名排序"
+            // 但仍然需要更新勾选状态
                     
                     // 更新勾选状态
                     document.querySelectorAll('.sort-option').forEach(opt => {
@@ -1863,11 +2050,56 @@ const getHTMLContent = (title) => `
                 });
             });
             
+            // 添加点击空白处折叠卡片的功能
+            document.addEventListener('click', function(e) {
+                // 检查是否处于"折叠"模式
+                const collapseButton = document.querySelector('.view-option[data-view="collapse-all"]');
+                if (collapseButton && collapseButton.classList.contains('btn-info')) {
+                    // 确保点击的是空白处，而不是卡片内部或其他功能按钮
+                    if (
+                        !e.target.closest('.domain-card') && 
+                        !e.target.closest('.btn') && 
+                        !e.target.closest('.modal') && 
+                        !e.target.closest('.navbar') &&
+                        !e.target.closest('.page-header') &&
+                        !e.target.closest('.dropdown-menu')
+                    ) {
+                        // 获取所有展开的卡片
+                        const expandedCards = document.querySelectorAll('.domain-card .collapse.show');
+                        
+                        // 折叠所有展开的卡片
+                        expandedCards.forEach(detail => {
+                            // 使用Bootstrap的collapse方法实现平滑的折叠动画
+                            const bsCollapse = bootstrap.Collapse.getInstance(detail);
+                            if (bsCollapse) {
+                                bsCollapse.hide();
+                            }
+                            
+                            // 获取父级卡片
+                            const domainCard = detail.closest('.domain-card');
+                            if (domainCard) {
+                                // 监听折叠完成事件，移除展开状态类
+                                detail.addEventListener('hidden.bs.collapse', function() {
+                                    // 移除展开状态类，恢复省略号显示
+                                    domainCard.classList.remove('expanded');
+                                }, {once: true}); // 只执行一次
+                                
+                                // 在父级卡片中寻找toggle按钮并更新状态
+                                const btn = domainCard.querySelector('.toggle-details');
+                                if (btn) {
+                                    btn.classList.add('collapsed');
+                                    btn.setAttribute('aria-expanded', 'false');
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+            
             // 初始加载时设置默认排序选项
             const defaultSortOption = document.querySelector('.sort-option[data-sort="' + currentSortField + '"][data-order="' + currentSortOrder + '"]');
             if (defaultSortOption) {
-                // 设置排序按钮文本
-                document.getElementById('sortDropdown').innerHTML = '<i class="iconfont icon-paixu"></i> ' + defaultSortOption.textContent.trim();
+                // 不再更新排序按钮文本，保持"域名排序"
                 
                 // 设置默认选项为激活状态
                 defaultSortOption.classList.add('active');
@@ -2092,1021 +2324,908 @@ const getHTMLContent = (title) => `
         }
         
         // 渲染域名列表
-function renderDomainList() {
-    // 获取domainListContainer
-    const domainListContainer = document.getElementById('domainListContainer');
-    if (!domainListContainer) {
-        console.error('renderDomainList: domainListContainer 元素不存在');
-        return;
-    }
-    
-    // 确保列结构存在
-    domainListContainer.innerHTML = 
-        '<div class="col-md-6 col-lg-4 domain-column px-1-5" id="column-1"></div>' +
-        '<div class="col-md-6 col-lg-4 domain-column px-1-5" id="column-2"></div>' +
-        '<div class="col-md-6 col-lg-4 domain-column px-1-5" id="column-3"></div>';
-    
-    // 获取三个列容器
-    const column1 = document.getElementById('column-1');
-    const column2 = document.getElementById('column-2');
-    const column3 = document.getElementById('column-3');
-    
-    if (!column1 || !column2 || !column3) {
-        console.error('renderDomainList: 列容器元素不存在');
-        return;
-    }
-    
-    if (domains.length === 0) {
-        // 显示无域名记录提示
-        domainListContainer.innerHTML = '<div class="col-12"><div class="alert alert-info">暂无域名记录，请点击右上角按钮添加域名。</div></div>';
-        return;
-    }
-    
-    // 获取列容器数组，用于循环分配卡片
-    const columns = [column1, column2, column3];
-    
-    // 获取全局通知设置
-    const globalNotifyDays = telegramConfig.notifyDays || 30;
-    
-    // 计算每个域名的剩余天数
-    domains.forEach(domain => {
-        const expiryDate = new Date(domain.expiryDate);
-        const today = new Date();
-        domain.daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
-        
-        // 调试输出价格信息
-        if (domain.price) {
-            console.log('域名 ' + domain.name + ' 的价格:', domain.price);
-        } else {
-            console.log('域名 ' + domain.name + ' 没有价格信息');
-        }
-    });
-    
-    // 按照指定字段和顺序排序
-    sortDomains(domains, currentSortField, currentSortOrder);
-    
-    // 为了保持每列的独立性，我们先对域名进行分组
-    const columnDomains = [[], [], []];
-    
-    // 将域名分配到不同的列中
-    domains.forEach((domain, index) => {
-        const columnIndex = index % 3;
-        columnDomains[columnIndex].push(domain);
-    });
-    
-    // 分别处理每一列的域名
-    columnDomains.forEach((domainGroup, columnIndex) => {
-        domainGroup.forEach(domain => {
-        const expiryDate = new Date(domain.expiryDate);
-        const today = new Date();
-        const daysLeft = domain.daysLeft;
-        
-        // 确保通知设置存在
-        if (!domain.notifySettings) {
-            domain.notifySettings = { useGlobalSettings: true, enabled: true, notifyDays: 30 };
-        }
-        
-        // 获取该域名的通知设置
-        const notifySettings = domain.notifySettings;
-        const notifyDays = notifySettings.useGlobalSettings ? globalNotifyDays : notifySettings.notifyDays;
-        
-        // 状态标签逻辑（与原来保持一致）
-        let statusClass = 'safe';
-        let statusText = '<i class="iconfont icon-circle-check"></i> 正常';
-        let statusBadge = 'success';
-        
-        // 进度条颜色逻辑（先初始化，后面根据百分比设置）
-        let progressColor = 'rgba(0, 255, 76, 0.9)'; // 默认绿色
-        
-        // 设置状态标签
-        if (daysLeft <= 0) {
-            statusClass = 'expired';
-            statusText = '<i class="iconfont icon-triangle-exclamation"></i> 已过期';
-            statusBadge = 'danger';
-        } else if (daysLeft <= 20) {  // 修改为固定20天，按需求调整
-            statusClass = 'warning';
-            statusText = '<i class="iconfont icon-bullhorn"></i> 即将到期';
-            statusBadge = 'warning';
-        }
-        
-        // 进度条颜色将在计算百分比后设置
-        
-        // 计算域名有效期的百分比进度
-        let totalDays = 0;
-        let progressPercent = 0;
-        
-        // 获取域名的续期周期设置，如果没有则使用默认值（1年）
-        let cycleDays = 365; // 默认为1年
-        
-        if (domain.renewCycle) {
-            // 根据续期周期单位计算天数
-            switch(domain.renewCycle.unit) {
-                case 'year':
-                    cycleDays = domain.renewCycle.value * 365;
-                    break;
-                case 'month':
-                    // 更精确地计算月份的实际天数
-                    if (domain.renewCycle.value === 1) {
-                        // 对于1个月的情况，计算下个月的同一天到这个月的同一天之间的实际天数
-                        const currentDate = new Date(domain.expiryDate);
-                        const nextMonth = new Date(currentDate);
-                        nextMonth.setMonth(nextMonth.getMonth() + 1);
-                        cycleDays = Math.round((nextMonth - currentDate) / (1000 * 60 * 60 * 24));
-                    } else {
-                        // 对于多个月的情况，计算每个月的实际天数
-                        const currentDate = new Date(domain.expiryDate);
-                        const futureDate = new Date(currentDate);
-                        futureDate.setMonth(futureDate.getMonth() + domain.renewCycle.value);
-                        cycleDays = Math.round((futureDate - currentDate) / (1000 * 60 * 60 * 24));
-                    }
-                    break;
-                case 'day':
-                    cycleDays = domain.renewCycle.value;
-                    break;
-                default:
-                    cycleDays = 365;
-            }
-        }
-        
-        // 简化进度条计算逻辑
-        if (daysLeft <= 0) {
-            // 已过期域名，但如果有lastRenewed字段，说明已续期
-            if (domain.lastRenewed) {
-                // 计算剩余天数占续费周期的百分比
-                const renewedDate = new Date(domain.lastRenewed);
-                const expiryDate = new Date(domain.expiryDate);
-                const newDaysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
-                
-                if (newDaysLeft >= cycleDays) {
-                    progressPercent = 100;
-                } else {
-                    // 使用精确计算，不进行四舍五入，保留整数部分
-                    progressPercent = Math.floor((newDaysLeft / cycleDays) * 100);
-                }
-            } else {
-                progressPercent = 0;
-            }
-        } else {
-            // 未过期域名
-            if (daysLeft >= cycleDays) {
-                progressPercent = 100;
-            } else {
-                // 使用精确计算，不进行四舍五入，保留整数部分
-                progressPercent = Math.floor((daysLeft / cycleDays) * 100);
-            }
-        }
-        
-        // 确保进度百分比在0-100范围内
-        if (progressPercent < 0) progressPercent = 0;
-        if (progressPercent > 100) progressPercent = 100;
-        
-        // 根据百分比设置进度条颜色
-        if (progressPercent < 10) {
-            progressColor = 'rgba(231, 18, 64, 0.9)'; // 小于10%显示红色
-        } else if (progressPercent < 30) {
-            progressColor = 'rgba(255, 208, 0, 0.9)'; // 10%-30%显示黄色
-        } else {
-            progressColor = 'rgba(0, 255, 76, 0.9)'; // 大于30%显示绿色
-        }
-        
-        // 创建圆环进度条样式
-        let progressCircleHtml = '';
-        
-        // 使用SVG实现圆环进度条
-        const radius = 28; // 略小的圆环半径，确保不会太接近边缘
-        const circumference = 2 * Math.PI * radius; // 圆环周长
-        const offset = circumference - (progressPercent / 100) * circumference; // 计算偏移量
-        
-        // 创建SVG圆环进度条，增加SVG尺寸
-        const svgSize = 65; // SVG容器大小
-        const svgCenter = svgSize / 2; // 居中
-        
-        // SVG圆环和百分比分开处理
-        const percentText = progressPercent + '%';
-        
-        if (daysLeft <= 0) {
-            // 已过期域名显示简化的进度条，但保留0%文本
-            progressCircleHtml = 
-                '<div style="position:relative; width:' + svgSize + 'px; height:' + svgSize + 'px;">' +
-                '<svg class="progress-ring" width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 ' + svgSize + ' ' + svgSize + '">' +
-                '<circle class="progress-ring-circle-bg" stroke="#f5f5f5" stroke-width="6" fill="transparent" r="' + radius + '" cx="' + svgCenter + '" cy="' + svgCenter + '"/>' +
-                '</svg>' +
-                '<div style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; z-index:9999;">' +
-                '<span class="progress-percent-text">0%</span>' +
-                '</div>' +
-                '</div>';
-        } else {
-            // 正常域名显示完整进度条
-            progressCircleHtml = 
-                '<div style="position:relative; width:' + svgSize + 'px; height:' + svgSize + 'px;">' +
-                '<svg class="progress-ring" width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 ' + svgSize + ' ' + svgSize + '">' +
-                '<circle class="progress-ring-circle-bg" stroke="#f5f5f5" stroke-width="6" fill="transparent" r="' + radius + '" cx="' + svgCenter + '" cy="' + svgCenter + '"/>' +
-                '<circle class="progress-ring-circle" stroke="' + progressColor + '" stroke-width="6" fill="transparent" ' +
-                'stroke-dasharray="' + circumference + ' ' + circumference + '" ' +
-                'style="stroke-dashoffset:' + offset + 'px;" ' +
-                'r="' + radius + '" cx="' + svgCenter + '" cy="' + svgCenter + '"/>' +
-                '</svg>' +
-                '<div style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; z-index:9999;">' +
-                '<span class="progress-percent-text">' + percentText + '</span>' +
-                '</div>' +
-                '</div>';
-        }
-        
-        // 创建卡片容器
-        const domainCard = document.createElement('div');
-        domainCard.className = 'mb-2'; // 进一步减小卡片间距
-        // 准备通知信息和上次续期信息
-        let infoHtml = '';
-        
-        // 添加自定义通知信息
-        if (!notifySettings.useGlobalSettings) {
-            infoHtml += '<small class="text-white d-inline-block me-3">' + 
-                (notifySettings.enabled ? '自定义通知: ' + notifySettings.notifyDays + '天' : '通知已禁用') + 
-                '</small>';
-        }
-        
-        // 添加上次续期信息
-        if (domain.lastRenewed) {
-            infoHtml += '<small class="text-white d-inline-block">上次续期: ' + formatDate(domain.lastRenewed) + '</small>';
-        }
-        
-        // 续期链接已整合到按钮行中，不再需要单独的变量
-        
-        const cardHtml = '<div class="card domain-card ' + statusClass + ' mb-2">' +
-            '<div class="card-header">' +
-            '<span class="status-dot ' + statusClass + '"></span>' +
-            '<div class="domain-header">' +
-            '<h5 class="mb-0"><strong>' + domain.name + '</strong></h5>' +
-            (domain.registrar ? '<div class="domain-meta">注册商: ' + domain.registrar + '</div>' : '') +
-            '</div>' +
-            '<div class="domain-status">' +
-            '<span class="badge bg-' + statusBadge + '">' + statusText + '</span>' +
-            '<button class="btn btn-sm btn-link toggle-details collapsed" data-bs-toggle="collapse" data-bs-target="#details-' + domain.id + '" aria-expanded="false" aria-controls="details-' + domain.id + '">' +
-            '<span class="toggle-icon-container">' +
-            '<i class="iconfont icon-angle-down toggle-icon"></i>' +
-            '</span>' +
-            '</button>' +
-            '</div>' +
-            '</div>' +
-            '<div class="collapse" id="details-' + domain.id + '">' +
-            '<div class="card-body pb-2">' +
-            '<div class="d-flex justify-content-between align-items-start mb-2">' +
-            '<div class="flex-grow-1">' +
-            (domain.registrationDate ? '<p class="card-text mb-1"><i class="iconfont icon-calendar-days"></i><strong>注册时间:</strong>' + formatDate(domain.registrationDate) + '</p>' : '') +
-            '<p class="card-text mb-1"><i class="iconfont icon-rili"></i><strong>到期日期:</strong>' + formatDate(domain.expiryDate) + '</p>' +
-            '<p class="card-text mb-1"><i class="iconfont icon-repeat"></i><strong>续期周期:</strong>' + 
-            (domain.renewCycle ? domain.renewCycle.value + ' ' + 
-            (domain.renewCycle.unit === 'year' ? '年' : 
-             domain.renewCycle.unit === 'month' ? '月' : '天') : '1 年') + 
-            (function() {
-                // 调试输出
-                console.log('渲染卡片 ' + domain.name + ' 的价格信息:', domain.price);
-                
-                if (domain.price) {
-                    return ' <span class="text-white-50">(' + domain.price.currency + domain.price.value + 
-                    '/' + (domain.price.unit === 'year' ? '年' : 
-                           domain.price.unit === 'month' ? '月' : '日') + 
-                    ')</span>';
-                } else {
-                    return '';
-                }
-            })() + '</p>' +
-            '<p class="card-text mb-0"><i class="iconfont icon-hourglass-start"></i><strong>剩余天数:</strong>' + (daysLeft > 0 ? daysLeft + ' 天 <span class="text-white-50">(' + formatDaysToYMD(daysLeft) + ')</span>' : '已过期') + '</p>' +
-            '</div>' +
-            '<div class="progress-circle-container">' +
-            '<div class="progress-circle">' +
-            progressCircleHtml +
-            '</div>' +
-            '</div>' +
-            '</div>' +
-            (infoHtml ? '<div class="domain-info mb-2">' + infoHtml + '</div>' : '') +
-            '<div class="domain-actions">' +
-            '<!-- 编辑按钮 -->' +
-            '<button class="btn btn-sm btn-primary edit-domain" data-id="' + domain.id + '" title="编辑域名"><i class="iconfont icon-pencil"></i> 编辑</button>' +
-            '<!-- 续期按钮 -->' +
-            '<button class="btn btn-sm btn-success renew-domain" data-id="' + domain.id + '" data-name="' + domain.name + '" data-expiry="' + domain.expiryDate + '" title="续期域名"><i class="iconfont icon-arrows-rotate"></i> 续期</button>' +
-            '<!-- 测试按钮 -->' +
-            '<button class="btn btn-sm btn-info test-domain-notify" data-id="' + domain.id + '" title="测试通知"><i class="iconfont icon-paper-plane"></i> 测试</button>' +
-            '<!-- 续期链接按钮 -->' +
-            (domain.renewLink ? 
-            '<a href="' + domain.renewLink + '" target="_blank" class="btn btn-sm btn-warning" title="前往续期页面"><i class="iconfont icon-link"></i> 链接</a>' : 
-            '<button class="btn btn-sm btn-secondary" disabled title="未设置续期链接"><i class="iconfont icon-link"></i> 链接</button>') +
-            '<!-- 删除按钮 -->' +
-            '<button class="btn btn-sm btn-danger delete-domain" data-id="' + domain.id + '" data-name="' + domain.name + '" title="删除域名"><i class="iconfont icon-shanchu"></i> 删除</button>' +
-            '</div>' +
-            '</div>' +
-            '</div>' +
-            '</div>';
-        domainCard.innerHTML = cardHtml;
-        
-        // 将卡片添加到对应的列中
-        columns[columnIndex].appendChild(domainCard);
-        });
-    });
-    
-    // 添加事件监听器
-    document.querySelectorAll('.edit-domain').forEach(button => {
-        button.addEventListener('click', () => editDomain(button.dataset.id));
-    });
-    
-    document.querySelectorAll('.delete-domain').forEach(button => {
-        button.addEventListener('click', () => showDeleteModal(button.dataset.id, button.dataset.name));
-    });
-    
-    document.querySelectorAll('.renew-domain').forEach(button => {
-        button.addEventListener('click', () => showRenewModal(button.dataset.id, button.dataset.name, button.dataset.expiry));
-    });
-    
-    // 添加测试通知按钮的事件监听器
-    document.querySelectorAll('.test-domain-notify').forEach(button => {
-        button.addEventListener('click', () => testDomainNotification(button.dataset.id));
-    });
-    
-            // 添加下拉按钮的事件监听器
-    document.querySelectorAll('.toggle-details').forEach(button => {
-        // 不需要额外的JavaScript处理，CSS transition会自动处理动画
-        button.addEventListener('click', function(e) {
-            // 如果当前是全部折叠模式，点击切换按钮会切换到自动折叠模式
-            // 但如果是全部展开模式，则保持该模式
-            if (viewMode === 'collapse-all') {
-                // 先阻止默认的bootstrap折叠/展开行为
-                e.preventDefault();
-                e.stopPropagation();
-                
-                // 切换到自动折叠模式
-                viewMode = 'auto-collapse';
-                
-                // 更新视图按钮文本
-                document.getElementById('viewStyleDropdown').innerHTML = 
-                    '<i class="iconfont icon-eye"></i> <span style="color: white;">列表样式</span>';
-                
-                // 获取当前按钮对应的卡片详情
-                const collapseTarget = document.querySelector(button.getAttribute('data-bs-target'));
-                
-                // 折叠所有其他卡片
-                document.querySelectorAll('.collapse.show').forEach(detail => {
-                    if (detail !== collapseTarget) {
-                        bootstrap.Collapse.getInstance(detail)?.hide();
-                    }
-                });
-                
-                // 切换当前卡片的状态
-                const collapseInstance = bootstrap.Collapse.getInstance(collapseTarget);
-                if (collapseInstance) {
-                    if (collapseTarget.classList.contains('show')) {
-                        collapseInstance.hide();
-                    } else {
-                        collapseInstance.show();
-                    }
-                }
-            } else if (viewMode === 'expand-all') {
-                // 在全部展开模式下，只处理折叠操作，不改变viewMode
-                const collapseTarget = document.querySelector(button.getAttribute('data-bs-target'));
-                const collapseInstance = bootstrap.Collapse.getInstance(collapseTarget);
-                
-                // 只有当用户尝试折叠卡片时才处理
-                if (collapseTarget.classList.contains('show')) {
-                    // 先阻止默认的bootstrap折叠行为
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    // 手动折叠当前卡片
-                    collapseInstance?.hide();
-                }
-                // 如果是尝试展开一个已折叠的卡片，使用默认行为
-            }
-            // 在自动折叠模式下，使用默认的bootstrap行为
-        });
-    });
-    
-    // 添加点击空白处关闭已展开卡片的功能（仅在自动折叠模式下有效）
-    document.addEventListener('click', function(event) {
-        // 只在自动折叠模式下处理，在expand-all模式下不自动折叠
-        if (viewMode === 'auto-collapse') {
-            // 检查点击的元素是否在卡片内部
-            const isClickInsideCard = event.target.closest('.domain-card');
-            const isClickOnToggleButton = event.target.closest('.toggle-details');
-            
-            // 如果点击不在卡片内部或不是点击了切换按钮
-            if (!isClickInsideCard || isClickOnToggleButton) {
+        function renderDomainList() {
+            // 获取domainListContainer
+            const domainListContainer = document.getElementById('domainListContainer');
+            if (!domainListContainer) {
+                console.error('renderDomainList: domainListContainer 元素不存在');
                 return;
             }
             
-            // 获取所有已展开的卡片详情
-            const expandedDetails = document.querySelectorAll('.collapse.show');
-            
-            // 获取当前点击的卡片中的详情元素
-            const currentCardDetails = isClickInsideCard ? isClickInsideCard.querySelector('.collapse') : null;
-            
-            // 关闭所有不是当前点击卡片的已展开详情
-            expandedDetails.forEach(detail => {
-                if (detail !== currentCardDetails) {
-                    // 使用Bootstrap的collapse API关闭
-                    bootstrap.Collapse.getInstance(detail)?.hide();
-                }
-            });
-        }
-    });
-    
-    // 点击页面空白处关闭所有展开的卡片（仅在自动折叠模式下有效）
-    document.addEventListener('click', function(event) {
-        // 只在自动折叠模式下处理，在expand-all模式下不自动折叠
-        if (viewMode === 'auto-collapse') {
-            // 如果点击的是页面空白处（不在任何卡片内）
-            if (!event.target.closest('.domain-card') && !event.target.closest('.modal') && !event.target.closest('.btn-action')) {
-                // 获取所有已展开的卡片详情
-                const expandedDetails = document.querySelectorAll('.collapse.show');
-                
-                // 关闭所有已展开的详情
-                expandedDetails.forEach(detail => {
-                    bootstrap.Collapse.getInstance(detail)?.hide();
-                });
+            if (domains.length === 0) {
+                // 显示无域名记录提示
+                domainListContainer.innerHTML = '<div class="col-12"><div class="alert alert-info">暂无域名记录，请点击右上角按钮添加域名。</div></div>';
+                return;
             }
+            
+            // 清空容器
+            domainListContainer.innerHTML = '';
+            
+            // 获取全局通知设置
+            const globalNotifyDays = telegramConfig.notifyDays || 30;
+            
+            // 计算每个域名的剩余天数
+            domains.forEach(domain => {
+                const expiryDate = new Date(domain.expiryDate);
+                const today = new Date();
+                domain.daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+            });
+            
+            // 按照指定字段和顺序排序
+            sortDomains(domains, currentSortField, currentSortOrder);
+            
+                // 按注册商分组域名
+    const domainGroups = {};
+    
+    // 创建默认分类
+    domainGroups['默认分类'] = [];
+    
+    // 将域名分配到不同的分组
+    domains.forEach(domain => {
+        if (domain.registrar && domain.registrar.trim() !== '') {
+            // 如果有注册商信息，添加到对应分组
+            if (!domainGroups[domain.registrar]) {
+                domainGroups[domain.registrar] = [];
+            }
+            domainGroups[domain.registrar].push(domain);
+        } else {
+            // 没有注册商信息的域名放入默认分类
+            domainGroups['默认分类'].push(domain);
         }
     });
+            
+            // 处理域名分组
+            const renderGroup = (groupName, groupDomains) => {
+                // 如果该分组没有域名，跳过
+                if (groupDomains.length === 0) return;
+                
+                // 创建分类容器，用于包含标题和卡片
+                const groupContainer = document.createElement('div');
+                groupContainer.className = 'domain-group-container'; // 移除mb-4类，使用CSS中定义的margin
+                domainListContainer.appendChild(groupContainer);
+                
+                // 创建分类标题行
+                const categoryRow = document.createElement('div');
+                categoryRow.className = 'row'; // 移除额外的margin类
+                categoryRow.innerHTML = 
+                    '<div class="col-12 px-1-5">' + /* 添加与卡片列相同的内边距类 */
+                        '<div class="category-header">' +
+                            '<h5 class="category-title">' + groupName + '</h5>' +
+                        '</div>' +
+                    '</div>';
+                groupContainer.appendChild(categoryRow);
+                
+                // 创建域名卡片行容器
+                const domainsRow = document.createElement('div');
+                domainsRow.className = 'row g-2';
+                groupContainer.appendChild(domainsRow);
+                
+                // 创建三列布局
+                const column1 = document.createElement('div');
+                const column2 = document.createElement('div');
+                const column3 = document.createElement('div');
+                column1.className = 'col-md-6 col-lg-4 domain-column px-1-5';
+                column2.className = 'col-md-6 col-lg-4 domain-column px-1-5';
+                column3.className = 'col-md-6 col-lg-4 domain-column px-1-5';
+                domainsRow.appendChild(column1);
+                domainsRow.appendChild(column2);
+                domainsRow.appendChild(column3);
+                
+                // 为每个域名创建卡片，并按列分配
+                groupDomains.forEach((domain, index) => {
+                    // 决定将卡片放入哪一列
+                    const columnIndex = index % 3;
+                    const targetColumn = columnIndex === 0 ? column1 : (columnIndex === 1 ? column2 : column3);
+                    // 创建卡片容器
+                    const domainCard = document.createElement('div');
+                    domainCard.className = 'mb-2'; // 简化类名，不再需要列类
+                    
+                    const daysLeft = domain.daysLeft;
+                    
+                    // 确保通知设置存在
+                    if (!domain.notifySettings) {
+                        domain.notifySettings = { useGlobalSettings: true, enabled: true, notifyDays: 30 };
+                    }
+                    
+                    // 获取该域名的通知设置
+                    const notifySettings = domain.notifySettings;
+                    const notifyDays = notifySettings.useGlobalSettings ? globalNotifyDays : notifySettings.notifyDays;
+                    
+                    // 状态标签逻辑
+                    let statusClass = 'safe';
+                    let statusText = '<i class="iconfont icon-circle-check"></i> 正常';
+                    let statusBadge = 'success';
+                    
+                    // 进度条颜色逻辑（先初始化，后面根据百分比设置）
+                    let progressColor = 'rgba(0, 255, 76, 0.9)'; // 默认绿色
+                    
+                    // 设置状态标签
+                    if (daysLeft <= 0) {
+                        statusClass = 'expired';
+                        statusText = '<i class="iconfont icon-triangle-exclamation"></i> 已过期';
+                        statusBadge = 'danger';
+                    } else if (daysLeft <= 20) {  // 修改为固定20天，按需求调整
+                        statusClass = 'warning';
+                        statusText = '<i class="iconfont icon-bullhorn"></i> 即将到期';
+                        statusBadge = 'warning';
+                    }
+                    
+                    // 计算域名有效期的百分比进度
+                    let progressPercent = 0;
+                    
+                    // 获取域名的续期周期设置，如果没有则使用默认值（1年）
+                    let cycleDays = 365; // 默认为1年
+                    
+                    if (domain.renewCycle) {
+                        // 根据续期周期单位计算天数
+                        switch(domain.renewCycle.unit) {
+                            case 'year':
+                                cycleDays = domain.renewCycle.value * 365;
+                                break;
+                            case 'month':
+                                // 更精确地计算月份的实际天数
+                                if (domain.renewCycle.value === 1) {
+                                    const currentDate = new Date(domain.expiryDate);
+                                    const nextMonth = new Date(currentDate);
+                                    nextMonth.setMonth(nextMonth.getMonth() + 1);
+                                    cycleDays = Math.round((nextMonth - currentDate) / (1000 * 60 * 60 * 24));
+                                } else {
+                                    const currentDate = new Date(domain.expiryDate);
+                                    const futureDate = new Date(currentDate);
+                                    futureDate.setMonth(futureDate.getMonth() + domain.renewCycle.value);
+                                    cycleDays = Math.round((futureDate - currentDate) / (1000 * 60 * 60 * 24));
+                                }
+                                break;
+                            case 'day':
+                                cycleDays = domain.renewCycle.value;
+                                break;
+                            default:
+                                cycleDays = 365;
+                        }
+                    }
+                    
+                    // 简化进度条计算逻辑
+                    if (daysLeft <= 0) {
+                        // 已过期域名，但如果有lastRenewed字段，说明已续期
+                        if (domain.lastRenewed) {
+                            const today = new Date();
+                            const expiryDate = new Date(domain.expiryDate);
+                            const newDaysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+                            
+                            if (newDaysLeft >= cycleDays) {
+                                progressPercent = 100;
+                            } else {
+                                // 使用精确计算，不进行四舍五入，保留整数部分
+                                progressPercent = Math.floor((newDaysLeft / cycleDays) * 100);
+                            }
+                        } else {
+                            progressPercent = 0;
+                        }
+                    } else {
+                        // 未过期域名
+                        if (daysLeft >= cycleDays) {
+                            progressPercent = 100;
+                        } else {
+                            // 使用精确计算，不进行四舍五入，保留整数部分
+                            progressPercent = Math.floor((daysLeft / cycleDays) * 100);
+                        }
+                    }
+                    
+                    // 确保进度百分比在0-100范围内
+                    if (progressPercent < 0) progressPercent = 0;
+                    if (progressPercent > 100) progressPercent = 100;
+                    
+                    // 根据百分比设置进度条颜色
+                    if (progressPercent < 10) {
+                        progressColor = 'rgba(231, 18, 64, 0.9)'; // 小于10%显示红色
+                    } else if (progressPercent < 30) {
+                        progressColor = 'rgba(255, 208, 0, 0.9)'; // 10%-30%显示黄色
+                    } else {
+                        progressColor = 'rgba(0, 255, 76, 0.9)'; // 大于30%显示绿色
+                    }
+                    
+                    // 创建圆环进度条样式
+                    let progressCircleHtml = '';
+                    
+                    // 使用SVG实现圆环进度条
+                    const radius = 28; // 略小的圆环半径，确保不会太接近边缘
+                    const circumference = 2 * Math.PI * radius; // 圆环周长
+                    const offset = circumference - (progressPercent / 100) * circumference; // 计算偏移量
+                    
+                    // 创建SVG圆环进度条，增加SVG尺寸
+                    const svgSize = 65; // SVG容器大小
+                    const svgCenter = svgSize / 2; // 居中
+                    
+                    // SVG圆环和百分比分开处理
+                    const percentText = progressPercent + '%';
+                    
+                    if (daysLeft <= 0) {
+                        // 已过期域名显示简化的进度条，但保留0%文本
+                        progressCircleHtml = 
+                            '<div style="position:relative; width:' + svgSize + 'px; height:' + svgSize + 'px;">' +
+                            '<svg class="progress-ring" width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 ' + svgSize + ' ' + svgSize + '">' +
+                            '<circle class="progress-ring-circle-bg" stroke="#f5f5f5" stroke-width="6" fill="transparent" r="' + radius + '" cx="' + svgCenter + '" cy="' + svgCenter + '"/>' +
+                            '</svg>' +
+                            '<div style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; z-index:9999;">' +
+                            '<span class="progress-percent-text">0%</span>' +
+                            '</div>' +
+                            '</div>';
+                    } else {
+                        // 正常域名显示完整进度条
+                        progressCircleHtml = 
+                            '<div style="position:relative; width:' + svgSize + 'px; height:' + svgSize + 'px;">' +
+                            '<svg class="progress-ring" width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 ' + svgSize + ' ' + svgSize + '">' +
+                            '<circle class="progress-ring-circle-bg" stroke="#f5f5f5" stroke-width="6" fill="transparent" r="' + radius + '" cx="' + svgCenter + '" cy="' + svgCenter + '"/>' +
+                            '<circle class="progress-ring-circle" stroke="' + progressColor + '" stroke-width="6" fill="transparent" ' +
+                            'stroke-dasharray="' + circumference + ' ' + circumference + '" ' +
+                            'style="stroke-dashoffset:' + offset + 'px;" ' +
+                            'r="' + radius + '" cx="' + svgCenter + '" cy="' + svgCenter + '"/>' +
+                            '</svg>' +
+                            '<div style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; z-index:9999;">' +
+                            '<span class="progress-percent-text">' + percentText + '</span>' +
+                            '</div>' +
+                            '</div>';
+                    }
+                    
+                    // 准备通知信息和上次续期信息
+                    let infoHtml = '';
+                    
+                    // 添加自定义通知信息
+                    if (!notifySettings.useGlobalSettings) {
+                        infoHtml += '<small class="text-white d-inline-block me-3">' + 
+                            (notifySettings.enabled ? '自定义通知: ' + notifySettings.notifyDays + '天' : '通知已禁用') + 
+                            '</small>';
+                    }
+                    
+                    // 添加上次续期信息
+                    if (domain.lastRenewed) {
+                        infoHtml += '<small class="text-white d-inline-block">上次续期: ' + formatDate(domain.lastRenewed) + '</small>';
+                    }
+                    
+                    // 生成价格信息HTML
+                    let priceHtml = '';
+                    if (domain.price && domain.price.value !== null && domain.price.value !== undefined && domain.price.value !== '') {
+                        priceHtml = ' <span class="text-white-50">(' + domain.price.currency + domain.price.value + 
+                        '/' + (domain.price.unit === 'year' ? '年' : domain.price.unit === 'month' ? '月' : '日') + 
+                        ')</span>';
+                    }
+                    
+                                    const cardHtml = '<div class="card domain-card ' + statusClass + ' mb-2">' +
+                '<div class="card-header">' +
+                '<span class="status-dot ' + statusClass + '"></span>' +
+                '<div class="domain-header">' +
+                (domain.customNote && domain.customNote.trim() !== '' ? 
+                    // 有备注时的布局 - 标签在域名下方
+                    '<div class="domain-name-container" style="display: flex; flex-direction: column; justify-content: flex-start; height: 100%;">' +
+                    '<h5 class="mb-0 domain-title" style="word-break: break-all;"><span class="domain-text" style="line-height: var(--domain-line-height);">' + domain.name + '</span></h5>' +
+                    '<div class="spacer" style="height: var(--domain-note-spacing);"></div>' +
+                    '<div class="domain-meta">' +
+                                                    '<span class="text-info ' + (domain.noteColor || 'tag-blue') + '" style="background-color: ' + 
+                                (domain.noteColor === 'tag-blue' ? '#3B82F6' : 
+                                domain.noteColor === 'tag-green' ? '#10B981' :
+                                domain.noteColor === 'tag-red' ? '#EF4444' : 
+                                domain.noteColor === 'tag-yellow' ? '#F59E0B' :
+                                domain.noteColor === 'tag-purple' ? '#8B5CF6' :
+                                domain.noteColor === 'tag-pink' ? '#EC4899' :
+                                domain.noteColor === 'tag-indigo' ? '#6366F1' :
+                                domain.noteColor === 'tag-gray' ? '#6B7280' : '#3B82F6') + 
+                                ' !important">' + domain.customNote + '</span>' +
+                    '</div>' +
+                    '</div>'
+                    : 
+                    // 无备注时的布局 - 保持与有备注布局相同的结构，只是没有备注标签
+                    '<div class="domain-name-container" style="display: flex; flex-direction: column; justify-content: flex-start; height: 100%;">' +
+                    '<h5 class="mb-0 domain-title" style="word-break: break-all;"><span class="domain-text" style="line-height: var(--domain-line-height);">' + domain.name + '</span></h5>' +
+                    '<div class="spacer" style="height: var(--domain-note-spacing);"></div>' +
+                    '<div class="domain-meta"></div>' +
+                    '</div>'
+                ) +
+                '</div>' +
+                        '<div class="domain-status">' +
+                        '<span class="badge bg-' + statusBadge + '">' + statusText + '</span>' +
+                        '<button class="btn btn-sm btn-link toggle-details collapsed" data-bs-toggle="collapse" data-bs-target="#details-' + domain.id + '" aria-expanded="false" aria-controls="details-' + domain.id + '">' +
+                        '<span class="toggle-icon-container">' +
+                        '<i class="iconfont icon-angle-down toggle-icon"></i>' +
+                        '</span>' +
+                        '</button>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="collapse" id="details-' + domain.id + '">' +
+                        '<div class="card-body pb-2">' +
+                        '<div class="d-flex justify-content-between align-items-start mb-2" style="position: relative;">' +
+                        '<div class="flex-grow-1" style="padding-right: 75px;">' +
+                        (domain.registrationDate ? '<p class="card-text mb-1 text-nowrap" style="overflow: hidden; text-overflow: ellipsis;"><i class="iconfont icon-calendar-days"></i><strong>注册时间:</strong>' + formatDate(domain.registrationDate) + '</p>' : '') +
+                        '<p class="card-text mb-1 text-nowrap" style="overflow: hidden; text-overflow: ellipsis;"><i class="iconfont icon-rili"></i><strong>到期日期:</strong>' + formatDate(domain.expiryDate) + '</p>' +
+                        '<p class="card-text mb-1 text-nowrap" style="overflow: hidden; text-overflow: ellipsis;"><i class="iconfont icon-repeat"></i><strong>续期周期:</strong>' + 
+                        (domain.renewCycle ? domain.renewCycle.value + ' ' + 
+                        (domain.renewCycle.unit === 'year' ? '年' : 
+                         domain.renewCycle.unit === 'month' ? '月' : '天') : '1 年') + 
+                        priceHtml + '</p>' +
+                        '<p class="card-text mb-0 text-nowrap" style="overflow: hidden; text-overflow: ellipsis;"><i class="iconfont icon-hourglass-start"></i><strong>剩余天数:</strong>' + (daysLeft > 0 ? daysLeft + ' 天 <span class="text-white-50">(' + formatDaysToYMD(daysLeft) + ')</span>' : '已过期') + '</p>' +
+                        '</div>' +
+                        '<div class="progress-circle-container">' +
+                        '<div class="progress-circle">' +
+                        progressCircleHtml +
+                        '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        (infoHtml ? '<div class="domain-info mb-2">' + infoHtml + '</div>' : '') +
+                        '<div class="domain-actions">' +
+                        '<!-- 编辑按钮 -->' +
+                        '<button class="btn btn-sm btn-primary edit-domain" data-id="' + domain.id + '" title="编辑域名"><i class="iconfont icon-pencil"></i> 编辑</button>' +
+                        '<!-- 续期按钮 -->' +
+                        '<button class="btn btn-sm btn-success renew-domain" data-id="' + domain.id + '" data-name="' + domain.name + '" data-expiry="' + domain.expiryDate + '" title="续期域名"><i class="iconfont icon-arrows-rotate"></i> 续期</button>' +
+                        '<!-- 测试按钮 -->' +
+                        '<button class="btn btn-sm btn-info test-domain-notify" data-id="' + domain.id + '" title="测试通知"><i class="iconfont icon-paper-plane"></i> 测试</button>' +
+                        '<!-- 续期链接按钮 -->' +
+                        (domain.renewLink ? 
+                        '<a href="' + domain.renewLink + '" target="_blank" class="btn btn-sm btn-warning" title="前往续期页面"><i class="iconfont icon-link"></i> 链接</a>' : 
+                        '<button class="btn btn-sm btn-secondary" disabled title="未设置续期链接"><i class="iconfont icon-link"></i> 链接</button>') +
+                        '<!-- 删除按钮 -->' +
+                        '<button class="btn btn-sm btn-danger delete-domain" data-id="' + domain.id + '" data-name="' + domain.name + '" title="删除域名"><i class="iconfont icon-shanchu"></i> 删除</button>' +
+                        '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '</div>';
+                    domainCard.innerHTML = cardHtml;
+                    
+                    // 将卡片添加到对应的列中
+                    targetColumn.appendChild(domainCard);
+                });
+            };
+            
+                // 首先处理默认分类
+    if (domainGroups['默认分类'] && domainGroups['默认分类'].length > 0) {
+        renderGroup('默认分类', domainGroups['默认分类']);
+        delete domainGroups['默认分类'];
+    }
     
-    // 处理视图模式更改
-    function handleViewModeChange() {
-        // 获取所有卡片的详情区域
-        const allCardDetails = document.querySelectorAll('.domain-card .collapse');
+    // 去除emoji的函数
+    function removeEmoji(str) {
+        // 匹配emoji的正则表达式
+        // 这个正则表达式匹配大多数常见的emoji
+        return str.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+    }
+    
+    // 然后处理其他分类（按名称升序排列，忽略emoji）
+    const sortedGroupNames = Object.keys(domainGroups).sort((a, b) => {
+        // 去除emoji后再进行比较
+        const aNoEmoji = removeEmoji(a).trim().toLowerCase();
+        const bNoEmoji = removeEmoji(b).trim().toLowerCase();
         
-        // 根据当前视图模式处理
-        switch (viewMode) {
-            case 'expand-all':
-                // 展开所有卡片 - 使用更直接的方法
-                allCardDetails.forEach(detail => {
-                    // 手动添加show类
-                    detail.classList.add('show');
-                    
-                    // 查找对应的切换按钮
-                    const detailId = detail.id;
-                    const toggleButton = document.querySelector('[data-bs-target="#' + detailId + '"]');
-                    if (toggleButton) {
-                        toggleButton.classList.remove('collapsed');
-                        toggleButton.setAttribute('aria-expanded', 'true');
-                    }
-                    
-                    // 处理父元素
-                    const parentCard = detail.closest('.domain-card');
-                    if (parentCard) {
-                        parentCard.classList.add('expanded');
-                    }
-                });
-                break;
-                
-            case 'collapse-all':
-                // 折叠所有卡片 - 使用更直接的方法
-                allCardDetails.forEach(detail => {
-                    // 手动移除show类
-                    detail.classList.remove('show');
-                    
-                    // 查找对应的切换按钮
-                    const detailId = detail.id;
-                    const toggleButton = document.querySelector('[data-bs-target="#' + detailId + '"]');
-                    if (toggleButton) {
-                        toggleButton.classList.add('collapsed');
-                        toggleButton.setAttribute('aria-expanded', 'false');
-                    }
-                    
-                    // 处理父元素
-                    const parentCard = detail.closest('.domain-card');
-                    if (parentCard) {
-                        parentCard.classList.remove('expanded');
-                    }
-                });
-                break;
-                
-            case 'auto-collapse':
-                // 默认全部折叠，然后用户可以手动展开/折叠
-                allCardDetails.forEach(detail => {
-                    // 手动移除show类
-                    detail.classList.remove('show');
-                    
-                    // 查找对应的切换按钮
-                    const detailId = detail.id;
-                    const toggleButton = document.querySelector('[data-bs-target="#' + detailId + '"]');
-                    if (toggleButton) {
-                        toggleButton.classList.add('collapsed');
-                        toggleButton.setAttribute('aria-expanded', 'false');
-                    }
-                    
-                    // 处理父元素
-                    const parentCard = detail.closest('.domain-card');
-                    if (parentCard) {
-                        parentCard.classList.remove('expanded');
-                    }
-                });
-                break;
-        }
-    }
+        // 使用localeCompare进行字符串比较，确保正确处理各种语言字符
+        return aNoEmoji.localeCompare(bNoEmoji, 'en');
+    });
     
-    // 确保所有卡片的collapse实例都被正确初始化
-    function initializeAllCollapses() {
-        document.querySelectorAll('.domain-card .collapse').forEach(detail => {
-            // 初始化Collapse实例
-            if (!bootstrap.Collapse.getInstance(detail)) {
-                new bootstrap.Collapse(detail, {
-                    toggle: false
-                });
-            }
+    // 按排序后的顺序渲染其他分类
+    for (const groupName of sortedGroupNames) {
+        renderGroup(groupName, domainGroups[groupName]);
+    }
             
-            // 为每个collapse元素添加事件监听，处理域名显示
-            detail.addEventListener('show.bs.collapse', function() {
-                const parentCard = detail.closest('.domain-card');
-                if (parentCard) {
-                    // 添加展开状态类，使域名可以换行显示
-                    parentCard.classList.add('expanded');
-                }
+            // 添加事件监听器
+            document.querySelectorAll('.edit-domain').forEach(button => {
+                button.addEventListener('click', () => editDomain(button.dataset.id));
             });
             
-            detail.addEventListener('hide.bs.collapse', function() {
-                const parentCard = detail.closest('.domain-card');
-                if (parentCard) {
-                    // 移除展开状态类，恢复省略号显示
-                    parentCard.classList.remove('expanded');
-                }
+            document.querySelectorAll('.delete-domain').forEach(button => {
+                button.addEventListener('click', () => showDeleteModal(button.dataset.id, button.dataset.name));
             });
             
-            // 确保初始状态正确
-            const parentCard = detail.closest('.domain-card');
-            if (parentCard && detail.classList.contains('show')) {
-                parentCard.classList.add('expanded');
-            }
-        });
-    }
-
-    // 确保所有卡片的collapse实例都被正确初始化
-    initializeAllCollapses();
-    
-    // 应用当前视图模式
-    handleViewModeChange();
-
-    /* 
-    // 示例：如何将按钮改为纯图标
-    // 将以下代码添加到renderDomainList函数的最后，或者修改上面的HTML生成代码
-
-    // 1. 将按钮文字替换为纯图标
-    const domainActionButtons = document.querySelectorAll('.domain-actions .btn');
-    domainActionButtons.forEach(button => {
-        // 保留图标，移除文字
-        const icon = button.querySelector('.iconfont');
-        if (icon) {
-            button.innerHTML = '';
-            button.appendChild(icon);
-            button.classList.add('btn-icon-only');
+            document.querySelectorAll('.renew-domain').forEach(button => {
+                button.addEventListener('click', () => showRenewModal(button.dataset.id, button.dataset.name, button.dataset.expiry));
+            });
+            
+            // 添加测试通知按钮的事件监听器
+            document.querySelectorAll('.test-domain-notify').forEach(button => {
+                button.addEventListener('click', () => testDomainNotification(button.dataset.id));
+            });
+            
+            // 添加下拉按钮的事件监听器
+            document.querySelectorAll('.toggle-details').forEach(button => {
+                // 监听Bootstrap折叠/展开事件，更新域名显示样式
+                const collapseTarget = document.querySelector(button.getAttribute('data-bs-target'));
+                if (collapseTarget) {
+                    // 监听展开事件
+                    collapseTarget.addEventListener('shown.bs.collapse', function() {
+                        // 找到包含此折叠内容的卡片
+                        const domainCard = this.closest('.domain-card');
+                        if (domainCard) {
+                            // 添加expanded类，使域名可以换行显示
+                            domainCard.classList.add('expanded');
+                        }
+                    });
+                    
+                    // 监听折叠事件
+                    collapseTarget.addEventListener('hidden.bs.collapse', function() {
+                        // 找到包含此折叠内容的卡片
+                        const domainCard = this.closest('.domain-card');
+                        if (domainCard) {
+                            // 移除expanded类，使域名显示省略号
+                            domainCard.classList.remove('expanded');
+                        }
+                    });
+                }
+                
+                // 原有的点击事件处理
+                button.addEventListener('click', function(e) {
+                    // 如果当前是全部折叠模式，点击切换按钮会切换到自动折叠模式
+                    // 但如果是全部展开模式，则保持该模式
+                    if (viewMode === 'collapse-all') {
+                        // 先阻止默认的bootstrap折叠/展开行为
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        // 切换到自动折叠模式
+                        viewMode = 'auto-collapse';
+                        
+                        // 更新视图按钮文本
+                        document.getElementById('viewStyleDropdown').innerHTML = 
+                            '<i class="iconfont icon-eye"></i> <span style="color: white;">列表样式</span>';
+                        
+                        // 获取当前按钮对应的卡片详情
+                        const collapseTarget = document.querySelector(button.getAttribute('data-bs-target'));
+                        
+                        // 折叠所有其他卡片
+                        document.querySelectorAll('.collapse.show').forEach(detail => {
+                            if (detail !== collapseTarget) {
+                                bootstrap.Collapse.getInstance(detail)?.hide();
+                            }
+                        });
+                        
+                        // 切换当前卡片的状态
+                        const collapseInstance = bootstrap.Collapse.getInstance(collapseTarget);
+                        if (collapseInstance) {
+                            if (collapseTarget.classList.contains('show')) {
+                                collapseInstance.hide();
+                            } else {
+                                collapseInstance.show();
+                            }
+                        }
+                    } else if (viewMode === 'expand-all') {
+                        // 在全部展开模式下，只处理折叠操作，不改变viewMode
+                        const collapseTarget = document.querySelector(button.getAttribute('data-bs-target'));
+                        const collapseInstance = bootstrap.Collapse.getInstance(collapseTarget);
+                        
+                        // 只有当用户尝试折叠卡片时才处理
+                        if (collapseTarget.classList.contains('show')) {
+                            // 先阻止默认的bootstrap折叠行为
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
+                            // 手动折叠当前卡片
+                            collapseInstance?.hide();
+                        }
+                        // 如果是尝试展开一个已折叠的卡片，使用默认行为
+                    }
+                    // 在自动折叠模式下，使用默认的bootstrap行为
+                });
+            });
         }
-    });
-
-    // 2. 修改续期链接为纯图标
-    const renewLinks = document.querySelectorAll('.renew-link-btn');
-    renewLinks.forEach(link => {
-        const icon = link.querySelector('.iconfont');
-        if (icon) {
-            link.innerHTML = '';
-            link.appendChild(icon);
-            link.classList.add('link-icon-only');
-            // 可以添加额外的样式
-            link.style.width = '40px';
-            link.style.height = '40px';
-            link.style.borderRadius = '50%';
-            link.style.display = 'flex';
-            link.style.alignItems = 'center';
-            link.style.justifyContent = 'center';
-            link.style.margin = '0 auto';
-        }
-    });
-
-    // 3. 修改未设置续期链接提示为纯图标
-    const disabledLinks = document.querySelectorAll('.disabled-link-btn');
-    disabledLinks.forEach(link => {
-        const icon = link.querySelector('.iconfont');
-        if (icon) {
-            link.innerHTML = '';
-            link.appendChild(icon);
-            link.classList.add('link-icon-only');
-            // 可以添加额外的样式
-            link.style.width = '40px';
-            link.style.height = '40px';
-            link.style.borderRadius = '50%';
-            link.style.display = 'flex';
-            link.style.alignItems = 'center';
-            link.style.justifyContent = 'center';
-            link.style.margin = '0 auto';
-        }
-    });
-    */
-}
         
         // 保存域名
-async function saveDomain() {
-    const domainId = document.getElementById('domainId').value;
-    const name = document.getElementById('domainName').value;
-    const expiryDate = document.getElementById('expiryDate').value;
-    const registrationDate = document.getElementById('registrationDate').value;
-    const registrar = document.getElementById('registrar').value;
-    const renewLink = document.getElementById('renewLink').value;
-    
-    // 获取续期周期设置
-    const renewCycleValue = parseInt(document.getElementById('renewCycleValue').value) || 1;
-    const renewCycleUnit = document.getElementById('renewCycleUnit').value;
-    
-    // 获取价格设置
-    const priceValue = document.getElementById('priceValue').value ? parseFloat(document.getElementById('priceValue').value) : null;
-    const priceCurrency = document.getElementById('priceCurrency').value;
-    const priceUnit = document.getElementById('priceUnit').value;
-    
-    // 获取上次续期时间，如果用户清除了则设为null
-    const lastRenewed = document.getElementById('lastRenewed').value || null;
-    
-    // 获取通知设置
-    const useGlobalSettings = document.getElementById('useGlobalSettings').checked;
-    const notifyEnabled = document.getElementById('notifyEnabled').checked;
-    const notifyDays = parseInt(document.getElementById('domainNotifyDays').value) || 30;
-    
-    if (!name || !expiryDate) {
-        showAlert('danger', '域名和到期日期为必填项');
-        return;
-    }
-    
-    // 确保通知设置字段存在且正确
-    const notifySettings = {
-        useGlobalSettings: useGlobalSettings,
-        enabled: notifyEnabled,
-        notifyDays: notifyDays
-    };
-    
-    // 构建价格对象
-    const priceObj = priceValue !== null ? {
-        value: priceValue,
-        currency: priceCurrency,
-        unit: priceUnit
-    } : null;
-    
-    // 调试输出
-    console.log('价格值:', priceValue);
-    console.log('货币单位:', priceCurrency);
-    console.log('价格周期:', priceUnit);
-    console.log('价格对象:', priceObj);
-    
-    const domainData = {
-        name,
-        expiryDate,
-        registrationDate,
-        registrar,
-        renewLink,
-        lastRenewed,
-        renewCycle: {
-            value: renewCycleValue,
-            unit: renewCycleUnit
-        },
-        price: priceObj,
-        notifySettings: notifySettings
-    };
+        async function saveDomain() {
+            const domainId = document.getElementById('domainId').value;
+            const name = document.getElementById('domainName').value;
+            const expiryDate = document.getElementById('expiryDate').value;
+            const registrationDate = document.getElementById('registrationDate').value;
+            const registrar = document.getElementById('registrar').value;
+            const customNote = document.getElementById('customNote').value;
+            const noteColor = document.getElementById('noteColor').value;
+            const renewLink = document.getElementById('renewLink').value;
             
-            try {
-                let response;
-                if (domainId) {
-                    // 更新现有域名
-                    domainData.id = domainId;
-                    response = await fetch('/api/domains/' + domainId, {
-                        headers: { 'Content-Type': 'application/json' },
-                        method: 'PUT',
-                        body: JSON.stringify(domainData)
-                    });
-                } else {
-                    // 添加新域名
-                    response = await fetch('/api/domains', {
-                        headers: { 'Content-Type': 'application/json' },
-                        method: 'POST',
-                        body: JSON.stringify(domainData)
-                    });
+            // 获取续期周期设置
+            const renewCycleValue = parseInt(document.getElementById('renewCycleValue').value) || 1;
+            const renewCycleUnit = document.getElementById('renewCycleUnit').value;
+            
+            // 获取价格设置
+            const priceValue = document.getElementById('priceValue').value ? parseFloat(document.getElementById('priceValue').value) : null;
+            const priceCurrency = document.getElementById('priceCurrency').value;
+            const priceUnit = document.getElementById('priceUnit').value;
+            
+            // 获取上次续期时间，如果用户清除了则设为null
+            const lastRenewed = document.getElementById('lastRenewed').value || null;
+            
+            // 获取通知设置
+            const useGlobalSettings = document.getElementById('useGlobalSettings').checked;
+            const notifyEnabled = document.getElementById('notifyEnabled').checked;
+            const notifyDays = parseInt(document.getElementById('domainNotifyDays').value) || 30;
+            
+            if (!name || !expiryDate) {
+                showAlert('danger', '域名和到期日期为必填项');
+                return;
+            }
+            
+            // 确保通知设置字段存在且正确
+            const notifySettings = {
+                useGlobalSettings: useGlobalSettings,
+                enabled: notifyEnabled,
+                notifyDays: notifyDays
+            };
+            
+            // 构建价格对象
+            const priceObj = priceValue !== null ? {
+                value: priceValue,
+                currency: priceCurrency,
+                unit: priceUnit
+            } : null;
+            
+            // 调试输出
+            console.log('价格值:', priceValue);
+            console.log('货币单位:', priceCurrency);
+            console.log('价格周期:', priceUnit);
+            console.log('价格对象:', priceObj);
+            console.log('备注颜色:', noteColor);
+            
+            const domainData = {
+                name,
+                expiryDate,
+                registrationDate,
+                registrar,
+                customNote,
+                noteColor,
+                renewLink,
+                lastRenewed,
+                renewCycle: {
+                    value: renewCycleValue,
+                    unit: renewCycleUnit
+                },
+                price: priceObj,
+                notifySettings: notifySettings
+            };
+                    
+                    try {
+                        let response;
+                        if (domainId) {
+                            // 更新现有域名
+                            domainData.id = domainId;
+                            response = await fetch('/api/domains/' + domainId, {
+                                headers: { 'Content-Type': 'application/json' },
+                                method: 'PUT',
+                                body: JSON.stringify(domainData)
+                            });
+                        } else {
+                            // 添加新域名
+                            response = await fetch('/api/domains', {
+                                headers: { 'Content-Type': 'application/json' },
+                                method: 'POST',
+                                body: JSON.stringify(domainData)
+                            });
+                        }
+                        
+                        if (!response.ok) throw new Error('保存域名失败');
+                        
+                        // 输出调试信息
+                        console.log('发送的数据:', domainData);
+                        
+                        // 关闭模态框并重新加载域名列表
+                        bootstrap.Modal.getInstance(document.getElementById('addDomainModal')).hide();
+                        resetForm();
+                        await loadDomains();
+                        showAlert('success', domainId ? '域名更新成功' : '域名添加成功');
+                    } catch (error) {
+                        showAlert('danger', '保存域名失败: ' + error.message);
+                    }
                 }
                 
-                if (!response.ok) throw new Error('保存域名失败');
+                // 编辑域名
+                function editDomain(id) {
+                    const domain = domains.find(d => d.id === id);
+                    if (!domain) return;
+                    
+                    document.getElementById('domainId').value = domain.id;
+                    document.getElementById('domainName').value = domain.name;
+                    document.getElementById('expiryDate').value = domain.expiryDate;
+                    document.getElementById('registrationDate').value = domain.registrationDate !== undefined ? domain.registrationDate : '';
+                    document.getElementById('registrar').value = domain.registrar !== undefined ? domain.registrar : '';
+                    document.getElementById('customNote').value = domain.customNote !== undefined ? domain.customNote : '';
+                    // 设置标签颜色（如果有）
+                    if (domain.noteColor) {
+                        document.getElementById('noteColor').value = domain.noteColor;
+                    } else {
+                        document.getElementById('noteColor').value = 'tag-blue'; // 默认蓝色
+                    }
+                    document.getElementById('renewLink').value = domain.renewLink !== undefined ? domain.renewLink : '';
+                    
+                    // 设置续期周期
+                    if (domain.renewCycle) {
+                        document.getElementById('renewCycleValue').value = domain.renewCycle.value || 1;
+                        document.getElementById('renewCycleUnit').value = domain.renewCycle.unit || 'year';
+                    } else {
+                        document.getElementById('renewCycleValue').value = 1;
+                        document.getElementById('renewCycleUnit').value = 'year';
+                    }
+                    
+                    // 设置价格
+                    if (domain.price) {
+                        document.getElementById('priceValue').value = domain.price.value;
+                        document.getElementById('priceCurrency').value = domain.price.currency || '¥';
+                        document.getElementById('priceUnit').value = domain.price.unit || 'year';
+                    } else {
+                        document.getElementById('priceValue').value = '';
+                        document.getElementById('priceCurrency').value = '¥';
+                        document.getElementById('priceUnit').value = 'year';
+                    }
+                    
+                    // 显示上次续期时间（如果有）
+                    const lastRenewedContainer = document.getElementById('lastRenewedContainer');
+                    const lastRenewedDisplay = document.getElementById('lastRenewedDisplay');
+                    const lastRenewed = document.getElementById('lastRenewed');
+                    
+                    if (domain.lastRenewed) {
+                        lastRenewedContainer.style.display = 'block';
+                        lastRenewedDisplay.textContent = formatDate(domain.lastRenewed);
+                        lastRenewed.value = domain.lastRenewed;
+                    } else {
+                        lastRenewedContainer.style.display = 'none';
+                        lastRenewedDisplay.textContent = '';
+                        lastRenewed.value = '';
+                    }
+                    
+                    // 设置通知选项
+                    const notifySettings = domain.notifySettings || { useGlobalSettings: true, enabled: true, notifyDays: 30 };
+                    document.getElementById('useGlobalSettings').checked = notifySettings.useGlobalSettings;
+                    document.getElementById('notifyEnabled').checked = notifySettings.enabled;
+                    document.getElementById('domainNotifyDays').value = notifySettings.notifyDays || 30;
+                    document.getElementById('domainNotifySettings').style.display = notifySettings.useGlobalSettings ? 'none' : 'block';
+                    
+                    document.querySelector('#addDomainModal .modal-title').textContent = '编辑域名';
+                    const modal = new bootstrap.Modal(document.getElementById('addDomainModal'));
+                    modal.show();
+                }
                 
-                // 输出调试信息
-                console.log('发送的数据:', domainData);
+                // 显示删除确认模态框
+                function showDeleteModal(id, name) {
+                    currentDomainId = id;
+                    document.getElementById('deleteModalDomainName').textContent = name;
+                    const modal = new bootstrap.Modal(document.getElementById('deleteDomainModal'));
+                    modal.show();
+                }
                 
-                // 关闭模态框并重新加载域名列表
-                bootstrap.Modal.getInstance(document.getElementById('addDomainModal')).hide();
-                resetForm();
-                await loadDomains();
-                showAlert('success', domainId ? '域名更新成功' : '域名添加成功');
-            } catch (error) {
-                showAlert('danger', '保存域名失败: ' + error.message);
-            }
-        }
-        
-        // 编辑域名
-        function editDomain(id) {
-            const domain = domains.find(d => d.id === id);
-            if (!domain) return;
-            
-            document.getElementById('domainId').value = domain.id;
-            document.getElementById('domainName').value = domain.name;
-            document.getElementById('expiryDate').value = domain.expiryDate;
-            document.getElementById('registrationDate').value = domain.registrationDate || '';
-            document.getElementById('registrar').value = domain.registrar || '';
-            document.getElementById('renewLink').value = domain.renewLink || '';
-            
-            // 设置续期周期
-            if (domain.renewCycle) {
-                document.getElementById('renewCycleValue').value = domain.renewCycle.value || 1;
-                document.getElementById('renewCycleUnit').value = domain.renewCycle.unit || 'year';
-            } else {
-                document.getElementById('renewCycleValue').value = 1;
-                document.getElementById('renewCycleUnit').value = 'year';
-            }
-            
-            // 设置价格
-            if (domain.price) {
-                document.getElementById('priceValue').value = domain.price.value;
-                document.getElementById('priceCurrency').value = domain.price.currency || '¥';
-                document.getElementById('priceUnit').value = domain.price.unit || 'year';
-            } else {
-                document.getElementById('priceValue').value = '';
-                document.getElementById('priceCurrency').value = '¥';
-                document.getElementById('priceUnit').value = 'year';
-            }
-            
-            // 显示上次续期时间（如果有）
-            const lastRenewedContainer = document.getElementById('lastRenewedContainer');
-            const lastRenewedDisplay = document.getElementById('lastRenewedDisplay');
-            const lastRenewed = document.getElementById('lastRenewed');
-            
-            if (domain.lastRenewed) {
-                lastRenewedContainer.style.display = 'block';
-                lastRenewedDisplay.textContent = formatDate(domain.lastRenewed);
-                lastRenewed.value = domain.lastRenewed;
-            } else {
-                lastRenewedContainer.style.display = 'none';
-                lastRenewedDisplay.textContent = '';
-                lastRenewed.value = '';
-            }
-            
-            // 设置通知选项
-            const notifySettings = domain.notifySettings || { useGlobalSettings: true, enabled: true, notifyDays: 30 };
-            document.getElementById('useGlobalSettings').checked = notifySettings.useGlobalSettings;
-            document.getElementById('notifyEnabled').checked = notifySettings.enabled;
-            document.getElementById('domainNotifyDays').value = notifySettings.notifyDays || 30;
-            document.getElementById('domainNotifySettings').style.display = notifySettings.useGlobalSettings ? 'none' : 'block';
-            
-            document.querySelector('#addDomainModal .modal-title').textContent = '编辑域名';
-            const modal = new bootstrap.Modal(document.getElementById('addDomainModal'));
-            modal.show();
-        }
-        
-        // 显示删除确认模态框
-        function showDeleteModal(id, name) {
-            currentDomainId = id;
-            document.getElementById('deleteModalDomainName').textContent = name;
-            const modal = new bootstrap.Modal(document.getElementById('deleteDomainModal'));
-            modal.show();
-        }
-        
-        // 删除域名
-        async function deleteDomain() {
-            if (!currentDomainId) return;
-            
-            try {
-                const response = await fetch('/api/domains/' + currentDomainId, {
-                    method: 'DELETE'
-                });
+                // 删除域名
+                async function deleteDomain() {
+                    if (!currentDomainId) return;
+                    
+                    try {
+                        const response = await fetch('/api/domains/' + currentDomainId, {
+                            method: 'DELETE'
+                        });
+                        
+                        if (!response.ok) throw new Error('删除域名失败');
+                        
+                        // 关闭模态框并重新加载域名列表
+                        bootstrap.Modal.getInstance(document.getElementById('deleteDomainModal')).hide();
+                        currentDomainId = null;
+                        await loadDomains();
+                        showAlert('success', '域名删除成功');
+                    } catch (error) {
+                        showAlert('danger', '删除域名失败: ' + error.message);
+                    }
+                }
                 
-                if (!response.ok) throw new Error('删除域名失败');
+                // 显示续期模态框
+                function showRenewModal(id, name, expiryDate) {
+                    currentDomainId = id;
+                    document.getElementById('renewModalDomainName').textContent = name;
+                    
+                    // 获取域名的续期周期设置
+                    const domain = domains.find(d => d.id === id);
+                    if (domain && domain.renewCycle) {
+                        document.getElementById('renewPeriodValue').value = domain.renewCycle.value;
+                        document.getElementById('renewPeriodUnit').value = domain.renewCycle.unit;
+                    } else {
+                        document.getElementById('renewPeriodValue').value = 1;
+                        document.getElementById('renewPeriodUnit').value = 'year';
+                    }
+                    
+                    // 计算新的到期日期
+                    updateNewExpiryDate();
+                    
+                    const modal = new bootstrap.Modal(document.getElementById('renewDomainModal'));
+                    modal.show();
+                }
                 
-                // 关闭模态框并重新加载域名列表
-                bootstrap.Modal.getInstance(document.getElementById('deleteDomainModal')).hide();
-                currentDomainId = null;
-                await loadDomains();
-                showAlert('success', '域名删除成功');
-            } catch (error) {
-                showAlert('danger', '删除域名失败: ' + error.message);
-            }
-        }
-        
-        // 显示续期模态框
-        function showRenewModal(id, name, expiryDate) {
-            currentDomainId = id;
-            document.getElementById('renewModalDomainName').textContent = name;
-            
-            // 获取域名的续期周期设置
-            const domain = domains.find(d => d.id === id);
-            if (domain && domain.renewCycle) {
-                document.getElementById('renewPeriodValue').value = domain.renewCycle.value;
-                document.getElementById('renewPeriodUnit').value = domain.renewCycle.unit;
-            } else {
-                document.getElementById('renewPeriodValue').value = 1;
-                document.getElementById('renewPeriodUnit').value = 'year';
-            }
-            
-            // 计算新的到期日期
-            updateNewExpiryDate();
-            
-            const modal = new bootstrap.Modal(document.getElementById('renewDomainModal'));
-            modal.show();
-        }
-        
-        // 更新新到期日期
-        function updateNewExpiryDate() {
-            const domain = domains.find(d => d.id === currentDomainId);
-            if (!domain) return;
-            
-            const renewValue = parseInt(document.getElementById('renewPeriodValue').value) || 1;
-            const renewUnit = document.getElementById('renewPeriodUnit').value;
-            
-            // 无论域名是否过期，都从原先的到期日期开始计算
-            const expiryDate = new Date(domain.expiryDate);
-            const newExpiryDate = new Date(expiryDate);
-            
-            // 根据选择的单位添加时间
-            switch(renewUnit) {
-                case 'year':
-                    newExpiryDate.setFullYear(expiryDate.getFullYear() + renewValue);
-                    break;
-                case 'month':
-                    newExpiryDate.setMonth(expiryDate.getMonth() + renewValue);
-                    break;
-                case 'day':
-                    newExpiryDate.setDate(expiryDate.getDate() + renewValue);
-                    break;
-            }
-            
-            document.getElementById('newExpiryDate').value = newExpiryDate.toISOString().split('T')[0];
-        }
-        
-        // 续期域名
-        async function renewDomain() {
-            if (!currentDomainId) return;
-            
-            const renewValue = parseInt(document.getElementById('renewPeriodValue').value) || 1;
-            const renewUnit = document.getElementById('renewPeriodUnit').value;
-            const newExpiryDate = document.getElementById('newExpiryDate').value;
-            
-            try {
-                const response = await fetch('/api/domains/' + currentDomainId + '/renew', {
-                    headers: { 'Content-Type': 'application/json' },
-                    method: 'POST',
-                    body: JSON.stringify({ 
-                        value: renewValue, 
-                        unit: renewUnit, 
-                        newExpiryDate 
-                    })
-                });
+                // 更新新到期日期
+                function updateNewExpiryDate() {
+                    const domain = domains.find(d => d.id === currentDomainId);
+                    if (!domain) return;
+                    
+                    const renewValue = parseInt(document.getElementById('renewPeriodValue').value) || 1;
+                    const renewUnit = document.getElementById('renewPeriodUnit').value;
+                    
+                    // 无论域名是否过期，都从原先的到期日期开始计算
+                    const expiryDate = new Date(domain.expiryDate);
+                    const newExpiryDate = new Date(expiryDate);
+                    
+                    // 根据选择的单位添加时间
+                    switch(renewUnit) {
+                        case 'year':
+                            newExpiryDate.setFullYear(expiryDate.getFullYear() + renewValue);
+                            break;
+                        case 'month':
+                            newExpiryDate.setMonth(expiryDate.getMonth() + renewValue);
+                            break;
+                        case 'day':
+                            newExpiryDate.setDate(expiryDate.getDate() + renewValue);
+                            break;
+                    }
+                    
+                    document.getElementById('newExpiryDate').value = newExpiryDate.toISOString().split('T')[0];
+                }
                 
-                if (!response.ok) throw new Error('域名续期失败');
+                // 续期域名
+                async function renewDomain() {
+                    if (!currentDomainId) return;
+                    
+                    const renewValue = parseInt(document.getElementById('renewPeriodValue').value) || 1;
+                    const renewUnit = document.getElementById('renewPeriodUnit').value;
+                    const newExpiryDate = document.getElementById('newExpiryDate').value;
+                    
+                    try {
+                        const response = await fetch('/api/domains/' + currentDomainId + '/renew', {
+                            headers: { 'Content-Type': 'application/json' },
+                            method: 'POST',
+                            body: JSON.stringify({ 
+                                value: renewValue, 
+                                unit: renewUnit, 
+                                newExpiryDate 
+                            })
+                        });
+                        
+                        if (!response.ok) throw new Error('域名续期失败');
+                        
+                        // 关闭模态框并重新加载域名列表
+                        bootstrap.Modal.getInstance(document.getElementById('renewDomainModal')).hide();
+                        currentDomainId = null;
+                        await loadDomains();
+                        showAlert('success', '域名续期成功');
+                    } catch (error) {
+                        showAlert('danger', '域名续期失败: ' + error.message);
+                    }
+                }
                 
-                // 关闭模态框并重新加载域名列表
-                bootstrap.Modal.getInstance(document.getElementById('renewDomainModal')).hide();
-                currentDomainId = null;
-                await loadDomains();
-                showAlert('success', '域名续期成功');
-            } catch (error) {
-                showAlert('danger', '域名续期失败: ' + error.message);
-            }
-        }
-        
-        // 重置表单
-        function resetForm() {
-            document.getElementById('domainId').value = '';
-            document.getElementById('domainName').value = '';
-            document.getElementById('expiryDate').value = '';
-            document.getElementById('registrationDate').value = '';
-            document.getElementById('registrar').value = '';
-            document.getElementById('renewLink').value = '';
-            
-            // 重置续期周期设置
-            document.getElementById('renewCycleValue').value = '1';
-            document.getElementById('renewCycleUnit').value = 'year';
-            
-            // 重置价格设置
-            document.getElementById('priceValue').value = '';
-            document.getElementById('priceCurrency').value = '¥';
-            document.getElementById('priceUnit').value = 'year';
-            
-            // 重置上次续期时间
-            document.getElementById('lastRenewed').value = '';
-            document.getElementById('lastRenewedContainer').style.display = 'none';
-            document.getElementById('lastRenewedDisplay').textContent = '';
-            document.getElementById('lastRenewedDisplay').classList.remove('text-danger');
-            
-            // 重置通知设置
-            document.getElementById('useGlobalSettings').checked = true;
-            document.getElementById('notifyEnabled').checked = true;
-            document.getElementById('domainNotifyDays').value = '30';
-            document.getElementById('domainNotifySettings').style.display = 'none';
-            
-            document.querySelector('#addDomainModal .modal-title').textContent = '添加新域名';
-        }
-        
-        // 显示提示信息
-function showAlert(type, message) {
-    const alertDiv = document.createElement('div');
-    alertDiv.className = 'alert alert-' + type + ' alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
-    alertDiv.style.zIndex = '9999';
-    alertDiv.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-    alertDiv.style.borderRadius = '8px';
-    alertDiv.style.minWidth = '300px';
-    alertDiv.style.maxWidth = '80%';
-    
-    // 根据消息类型选择合适的图标
-    let iconClass = '';
-    switch(type) {
-        case 'success':
-            iconClass = 'icon-success';
-            break;
-        case 'danger':
-            iconClass = 'icon-error';
-            break;
-        case 'warning':
-            iconClass = 'icon-warning';
-            break;
-        case 'info':
-            iconClass = 'icon-info';
-            break;
-    }
-    
-    alertDiv.innerHTML = '<i class="iconfont ' + iconClass + '"></i> ' + message +
-        '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
-    document.body.appendChild(alertDiv);
-    
-    // 3秒后自动消失
-    setTimeout(() => {
-        alertDiv.classList.remove('show');
-        setTimeout(() => alertDiv.remove(), 300);
-    }, 3000);
-}
-        
-        // 格式化日期
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            return date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
-        }
+                // 重置表单
+                function resetForm() {
+                    document.getElementById('domainId').value = '';
+                    document.getElementById('domainName').value = '';
+                    document.getElementById('expiryDate').value = '';
+                    document.getElementById('registrationDate').value = '';
+                    document.getElementById('registrar').value = '';
+                    document.getElementById('customNote').value = '';
+                    document.getElementById('noteColor').value = 'tag-blue'; // 重置为默认蓝色
+                    document.getElementById('renewLink').value = '';
+                    
+                    // 重置续期周期设置
+                    document.getElementById('renewCycleValue').value = '1';
+                    document.getElementById('renewCycleUnit').value = 'year';
+                    
+                    // 重置价格设置
+                    document.getElementById('priceValue').value = '';
+                    document.getElementById('priceCurrency').value = '¥';
+                    document.getElementById('priceUnit').value = 'year';
+                    
+                    // 重置上次续期时间
+                    document.getElementById('lastRenewed').value = '';
+                    document.getElementById('lastRenewedContainer').style.display = 'none';
+                    document.getElementById('lastRenewedDisplay').textContent = '';
+                    document.getElementById('lastRenewedDisplay').classList.remove('text-danger');
+                    
+                    // 重置通知设置
+                    document.getElementById('useGlobalSettings').checked = true;
+                    document.getElementById('notifyEnabled').checked = true;
+                    document.getElementById('domainNotifyDays').value = '30';
+                    document.getElementById('domainNotifySettings').style.display = 'none';
+                    
+                    document.querySelector('#addDomainModal .modal-title').textContent = '添加新域名';
+                }
+                
+                // 显示提示信息
+                function showAlert(type, message) {
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert alert-' + type + ' alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+                    alertDiv.style.zIndex = '9999';
+                    alertDiv.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                    alertDiv.style.borderRadius = '8px';
+                    alertDiv.style.minWidth = '300px';
+                    alertDiv.style.maxWidth = '80%';
+                    
+                    // 根据消息类型选择合适的图标
+                    let iconClass = '';
+                    switch(type) {
+                        case 'success':
+                            iconClass = 'icon-success';
+                            break;
+                        case 'danger':
+                            iconClass = 'icon-error';
+                            break;
+                        case 'warning':
+                            iconClass = 'icon-warning';
+                            break;
+                        case 'info':
+                            iconClass = 'icon-info';
+                            break;
+                    }
+                    
+                    alertDiv.innerHTML = '<i class="iconfont ' + iconClass + '"></i> ' + message +
+                        '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+                    document.body.appendChild(alertDiv);
+                    
+                    // 3秒后自动消失
+                    setTimeout(() => {
+                        alertDiv.classList.remove('show');
+                        setTimeout(() => alertDiv.remove(), 300);
+                    }, 3000);
+                }
+                
+                // 格式化日期
+                function formatDate(dateString) {
+                    const date = new Date(dateString);
+                    return date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                }
 
-        // 添加测试单个域名通知的函数
-        async function testDomainNotification(domainId) {
-            try {
-                const response = await fetch('/api/domains/' + domainId + '/test-notify', {
-                    method: 'POST'
-                });
-                
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || '测试失败');
+                // 添加测试单个域名通知的函数
+                async function testDomainNotification(domainId) {
+                    try {
+                        const response = await fetch('/api/domains/' + domainId + '/test-notify', {
+                            method: 'POST'
+                        });
+                        
+                        if (!response.ok) {
+                            const error = await response.json();
+                            throw new Error(error.error || '测试失败');
+                        }
+                        
+                        const result = await response.json();
+                        showAlert('success', '通知测试成功！请检查Telegram是否收到消息');
+                    } catch (error) {
+                        showAlert('danger', '测试通知失败: ' + error.message);
+                    }
                 }
-                
-                const result = await response.json();
-                showAlert('success', '通知测试成功！请检查Telegram是否收到消息');
-            } catch (error) {
-                showAlert('danger', '测试通知失败: ' + error.message);
-            }
-        }
 
-        // 按照指定字段和顺序排序域名
-        function sortDomains(domains, field, order) {
-            domains.sort((a, b) => {
-                let valueA, valueB;
-                
-                // 根据字段提取排序值
-                switch (field) {
-                    case 'name':
-                        valueA = a.name.toLowerCase();
-                        valueB = b.name.toLowerCase();
-                        break;
-                    case 'registrar':
-                        valueA = (a.registrar || '').toLowerCase();
-                        valueB = (b.registrar || '').toLowerCase();
-                        break;
-                    case 'expiryDate':
-                        valueA = new Date(a.expiryDate).getTime();
-                        valueB = new Date(b.expiryDate).getTime();
-                        break;
-                    case 'daysLeft':
-                        valueA = a.daysLeft;
-                        valueB = b.daysLeft;
-                        break;
-                    case 'notifyDays':
-                        const notifySettingsA = a.notifySettings || { useGlobalSettings: true, notifyDays: 30 };
-                        const notifySettingsB = b.notifySettings || { useGlobalSettings: true, notifyDays: 30 };
-                        valueA = notifySettingsA.useGlobalSettings ? (telegramConfig.notifyDays || 30) : notifySettingsA.notifyDays;
-                        valueB = notifySettingsB.useGlobalSettings ? (telegramConfig.notifyDays || 30) : notifySettingsB.notifyDays;
-                        break;
-                    default:
-                        valueA = a.daysLeft;
-                        valueB = b.daysLeft;
+                // 按照指定字段和顺序排序域名
+                function sortDomains(domains, field, order) {
+                    domains.sort((a, b) => {
+                        let valueA, valueB;
+                        
+                        // 根据字段提取排序值
+                        switch (field) {
+                            case 'name':
+                                valueA = a.name.toLowerCase();
+                                valueB = b.name.toLowerCase();
+                                break;
+                            case 'customNote':
+                                valueA = (a.customNote || '').toLowerCase();
+                                valueB = (b.customNote || '').toLowerCase();
+                                break;
+                            case 'expiryDate':
+                                valueA = new Date(a.expiryDate).getTime();
+                                valueB = new Date(b.expiryDate).getTime();
+                                break;
+                            case 'daysLeft':
+                                valueA = a.daysLeft;
+                                valueB = b.daysLeft;
+                                break;
+                            case 'notifyDays':
+                                const notifySettingsA = a.notifySettings || { useGlobalSettings: true, notifyDays: 30 };
+                                const notifySettingsB = b.notifySettings || { useGlobalSettings: true, notifyDays: 30 };
+                                valueA = notifySettingsA.useGlobalSettings ? (telegramConfig.notifyDays || 30) : notifySettingsA.notifyDays;
+                                valueB = notifySettingsB.useGlobalSettings ? (telegramConfig.notifyDays || 30) : notifySettingsB.notifyDays;
+                                break;
+                            default:
+                                valueA = a.daysLeft;
+                                valueB = b.daysLeft;
+                        }
+                        
+                        // 根据排序顺序返回比较结果
+                        if (order === 'asc') {
+                            return valueA > valueB ? 1 : valueA < valueB ? -1 : 0;
+                        } else {
+                            return valueA < valueB ? 1 : valueA > valueB ? -1 : 0;
+                        }
+                    });
                 }
-                
-                // 根据排序顺序返回比较结果
-                if (order === 'asc') {
-                    return valueA > valueB ? 1 : valueA < valueB ? -1 : 0;
-                } else {
-                    return valueA < valueB ? 1 : valueA > valueB ? -1 : 0;
-                }
-            });
-        }
-    </script>
-</body>
-</html>
+            </script>
+        </body>
+    </html>
 `;
 
 // 处理请求
@@ -3116,32 +3235,20 @@ async function handleRequest(request) {
   
   // 获取标题
   // 优先级：环境变量 > 代码变量 > 默认值'域名到期监控'
-  let siteTitle;
-  if (typeof TITLE !== 'undefined' && TITLE !== '') {
-    // 如果环境变量中有设置，使用环境变量
-    siteTitle = TITLE;
-  } else if (DEFAULT_TITLE !== '') {
-    // 如果环境变量中没有，但代码变量有设置，使用代码变量
-    siteTitle = DEFAULT_TITLE;
-  } else {
-    // 如果环境变量和代码变量都没有设置，使用默认值
-    siteTitle = '域名到期监控';
+  let siteTitle = '域名到期监控';
+  if (typeof SITE_NAME !== 'undefined' && SITE_NAME) {
+    siteTitle = SITE_NAME;
+  } else if (DEFAULT_SITE_NAME) {
+    siteTitle = DEFAULT_SITE_NAME;
   }
 
   // 获取正确的密码
   // 优先级：环境变量 > 代码变量 > 默认密码'domain'
-  let correctPassword;
-  
-  // 检查是否有环境变量TOKEN
-  if (typeof TOKEN !== 'undefined' && TOKEN !== '') {
-    // 使用环境变量中的TOKEN
+  let correctPassword = 'domain';
+  if (typeof TOKEN !== 'undefined' && TOKEN) {
     correctPassword = TOKEN;
-  } else if (DEFAULT_TOKEN !== '') {
-    // 使用代码中定义的DEFAULT_TOKEN
+  } else if (DEFAULT_TOKEN) {
     correctPassword = DEFAULT_TOKEN;
-  } else {
-    // 如果环境变量和代码中都没有设置，使用默认密码
-    correctPassword = 'domain';
   }
 
   // 检查是否已经登录（通过cookie）
@@ -3434,14 +3541,16 @@ async function updateDomain(id, domainData) {
     };
   }
   
-  // 更新域名
+  // 更新域名 - 确保正确处理空值
   domains[index] = {
     ...domains[index],
     name: domainData.name,
     expiryDate: domainData.expiryDate,
-    registrationDate: domainData.registrationDate || domains[index].registrationDate,
-    registrar: domainData.registrar,
-    renewLink: domainData.renewLink || domains[index].renewLink, // 更新续费链接
+    registrationDate: domainData.registrationDate !== undefined ? domainData.registrationDate : domains[index].registrationDate,
+    registrar: domainData.registrar !== undefined ? domainData.registrar : domains[index].registrar,
+    customNote: domainData.customNote !== undefined ? domainData.customNote : domains[index].customNote, // 正确处理空字符串
+    noteColor: domainData.noteColor !== undefined ? domainData.noteColor : domains[index].noteColor, // 添加备注颜色处理
+    renewLink: domainData.renewLink !== undefined ? domainData.renewLink : domains[index].renewLink, // 正确处理空字符串
     renewCycle: domainData.renewCycle || domains[index].renewCycle,
     price: domainData.price !== undefined ? domainData.price : domains[index].price, // 添加价格信息，保留现有价格如果未提供
     lastRenewed: domainData.lastRenewed !== undefined ? domainData.lastRenewed : domains[index].lastRenewed, // 根据用户选择更新续期时间
@@ -3994,7 +4103,7 @@ function addCopyrightFooter(html) {
   // 页脚图标颜色（使用CSS颜色值，如：#4e54c8、blue、rgba(0,0,0,0.7)等）
   const footerIconColor = 'white';
   
-  const footerContent = `<span style="color: white;">Copyright © 2025 Faiz</span> | <i class="iconfont icon-github" style="font-size: ${footerIconSize}; color: ${footerIconColor};"></i><a href="https://github.com/kamanfaiz" target="_blank" style="color: white; text-decoration: none;">GitHub Repository</a> | <i class="iconfont icon-book" style="font-size: ${footerIconSize}; color: ${footerIconColor};"></i><a href="https://blog.faiz.hidns.co/" target="_blank" style="color: white; text-decoration: none;">Faiz博客</a>`;
+  const footerContent = `<span style="color: white;">Copyright © 2025 Faiz</span> | <i class="iconfont icon-github" style="font-size: ${footerIconSize}; color: ${footerIconColor};"></i><a href="https://github.com/kamanfaiz/CF-Domain-Autocheck" target="_blank" style="color: white; text-decoration: none;">GitHub Repository</a> | <i class="iconfont icon-book" style="font-size: ${footerIconSize}; color: ${footerIconColor};"></i><a href="https://blog.faiz.hidns.co/" target="_blank" style="color: white; text-decoration: none;">Faiz博客</a>`;
   
   const bodyEndIndex = html.lastIndexOf('</body>');
   
