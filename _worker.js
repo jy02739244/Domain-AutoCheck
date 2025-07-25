@@ -1,6 +1,50 @@
 /*域名监控系统 - Cloudflare Workers*/
 /*使用KV存储域名信息*/
 
+// 检查是否在Pages环境中运行，如果是则导出函数
+export default {
+  async fetch(request, env, ctx) {
+    // 在Pages环境中，env包含绑定的变量
+    // 将env中的绑定赋值给全局变量，以便与Workers环境兼容
+    if (typeof DOMAIN_MONITOR === 'undefined' && env && env.DOMAIN_MONITOR) {
+      globalThis.DOMAIN_MONITOR = env.DOMAIN_MONITOR;
+    }
+    
+    // 其他环境变量
+    if (env) {
+      if (env.TOKEN) globalThis.TOKEN = env.TOKEN;
+      if (env.SITE_NAME) globalThis.SITE_NAME = env.SITE_NAME;
+      if (env.TG_TOKEN) globalThis.TG_TOKEN = env.TG_TOKEN;
+      if (env.TG_ID) globalThis.TG_ID = env.TG_ID;
+      if (env.LOGO_URL) globalThis.LOGO_URL = env.LOGO_URL;
+      if (env.BACKGROUND_URL) globalThis.BACKGROUND_URL = env.BACKGROUND_URL;
+    }
+    
+    return handleRequest(request);
+  },
+  
+  // 添加定时任务支持
+  async scheduled(event, env, ctx) {
+    // 在Pages环境中，env包含绑定的变量
+    if (typeof DOMAIN_MONITOR === 'undefined' && env && env.DOMAIN_MONITOR) {
+      globalThis.DOMAIN_MONITOR = env.DOMAIN_MONITOR;
+    }
+    
+    // 其他环境变量
+    if (env) {
+      if (env.TOKEN) globalThis.TOKEN = env.TOKEN;
+      if (env.SITE_NAME) globalThis.SITE_NAME = env.SITE_NAME;
+      if (env.TG_TOKEN) globalThis.TG_TOKEN = env.TG_TOKEN;
+      if (env.TG_ID) globalThis.TG_ID = env.TG_ID;
+    }
+    
+    // 检查是否已配置KV
+    if (typeof DOMAIN_MONITOR !== 'undefined') {
+      return checkExpiringDomains();
+    }
+  }
+};
+
 // iconfont阿里巴巴图标库
 const ICONFONT_CSS = '//at.alicdn.com/t/c/font_4973034_ehjc2dhuu76.css';
 const ICONFONT_JS = '//at.alicdn.com/t/c/font_4973034_ehjc2dhuu76.js';
@@ -3230,6 +3274,14 @@ const getHTMLContent = (title) => `
 
 // 处理请求
 async function handleRequest(request) {
+  // 检查是否已配置KV
+  if (!isKVConfigured()) {
+    return new Response(getSetupHTML(), {
+      headers: { 'Content-Type': 'text/html;charset=UTF-8' },
+      status: 200
+    });
+  }
+
   const url = new URL(request.url);
   const path = url.pathname;
   
@@ -4083,14 +4135,168 @@ function formatDaysToYMD(days) {
   return result;
 }
 
-// 注册Cloudflare Workers事件处理程序
+// 检查是否已配置KV
+function isKVConfigured() {
+  return typeof DOMAIN_MONITOR !== 'undefined';
+}
+
+// 获取配置向导HTML
+function getSetupHTML() {
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>域名监控系统 - 配置向导</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background-color: #f8f9fa;
+      padding: 20px;
+    }
+    .setup-container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .step {
+      margin-bottom: 20px;
+      padding: 15px;
+      border-left: 4px solid #4e54c8;
+      background-color: #f8f9fa;
+    }
+    .step-number {
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      background-color: #4e54c8;
+      color: white;
+      text-align: center;
+      line-height: 30px;
+      border-radius: 50%;
+      margin-right: 10px;
+    }
+    code {
+      background-color: #f1f1f1;
+      padding: 2px 5px;
+      border-radius: 3px;
+    }
+    img {
+      max-width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="setup-container">
+    <h1 class="mb-4">域名监控系统 - 配置向导</h1>
+    
+    <div class="alert alert-info">
+      <strong>提示：</strong> 您已成功部署Worker，但需要完成以下配置才能正常使用系统。
+    </div>
+    
+    <div class="step">
+      <h3><span class="step-number">1</span> 创建KV命名空间</h3>
+      <p>在Cloudflare控制台中，需要创建一个KV命名空间用于存储域名数据：</p>
+      <ol>
+        <li>登录到您的Cloudflare控制台</li>
+        <li>点击左侧菜单中的"Workers & Pages"</li>
+        <li>选择"KV"选项卡</li>
+        <li>点击"创建命名空间"按钮</li>
+        <li>输入命名空间名称：<code>DOMAIN_MONITOR</code></li>
+        <li>点击"添加"按钮创建</li>
+      </ol>
+    </div>
+    
+    <div class="step">
+      <h3><span class="step-number">2</span> 绑定KV到您的Worker</h3>
+      <p>创建KV命名空间后，需要将其绑定到您的Worker：</p>
+      <ol>
+        <li>在"Workers & Pages"中找到您部署的Worker</li>
+        <li>点击Worker名称进入详情页面</li>
+        <li>点击"设置"选项卡</li>
+        <li>找到"变量"部分，点击"KV命名空间绑定"</li>
+        <li>点击"添加绑定"按钮</li>
+        <li>变量名称输入：<code>DOMAIN_MONITOR</code></li>
+        <li>KV命名空间选择您刚创建的命名空间</li>
+        <li>点击"保存"按钮</li>
+      </ol>
+    </div>
+    
+    <div class="step">
+      <h3><span class="step-number">3</span> 配置环境变量（可选）</h3>
+      <p>您可以配置以下环境变量来自定义系统：</p>
+      <ul>
+        <li><code>TOKEN</code> - 登录密码（默认为"domain"）</li>
+        <li><code>SITE_NAME</code> - 网站标题</li>
+        <li><code>TG_TOKEN</code> - Telegram机器人Token</li>
+        <li><code>TG_ID</code> - Telegram聊天ID</li>
+        <li><code>LOGO_URL</code> - 自定义Logo图片URL</li>
+        <li><code>BACKGROUND_URL</code> - 自定义背景图片URL</li>
+      </ul>
+      <p>配置步骤：</p>
+      <ol>
+        <li>在Worker详情页面的"设置"选项卡中</li>
+        <li>找到"变量"部分，点击"环境变量"</li>
+        <li>点击"添加变量"按钮</li>
+        <li>输入变量名和值</li>
+        <li>点击"保存"按钮</li>
+      </ol>
+    </div>
+    
+    <div class="step">
+      <h3><span class="step-number">4</span> 配置定时触发器（可选）</h3>
+      <p>为了启用自动检查域名到期的功能，需要设置定时触发器：</p>
+      <ol>
+        <li>在Worker详情页面的"触发器"选项卡中</li>
+        <li>找到"Cron触发器"部分</li>
+        <li>点击"添加Cron触发器"</li>
+        <li>输入Cron表达式：<code>0 0 * * *</code>（每天午夜运行）</li>
+        <li>点击"添加"按钮</li>
+      </ol>
+    </div>
+    
+    <div class="step">
+      <h3><span class="step-number">5</span> 完成配置</h3>
+      <p>完成以上步骤后，刷新您的Worker页面即可开始使用域名监控系统。</p>
+      <p>默认登录密码为：<code>domain</code>（除非您在环境变量中设置了TOKEN）</p>
+    </div>
+    
+    <div class="mt-4 text-center">
+      <button class="btn btn-primary" onclick="window.location.reload()">刷新页面检查配置</button>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+// 注册Cloudflare Workers事件处理程序（传统Workers模式）
+// 如果是通过Pages部署，这些监听器会被忽略，而是使用上面的导出函数
 addEventListener('fetch', event => {
+  // 检查是否已配置KV
+  if (!isKVConfigured()) {
+    event.respondWith(new Response(getSetupHTML(), {
+      headers: { 'Content-Type': 'text/html;charset=UTF-8' },
+      status: 200
+    }));
+    return;
+  }
+  
   event.respondWith(handleRequest(event.request));
 });
 
 // 注册定时任务，每天检查一次
 addEventListener('scheduled', event => {
-  event.waitUntil(checkExpiringDomains());
+  // 检查是否已配置KV
+  if (isKVConfigured()) {
+    event.waitUntil(checkExpiringDomains());
+  }
 });
 
 // 添加页面底部版权信息
