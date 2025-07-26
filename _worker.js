@@ -3462,15 +3462,13 @@ async function isKvBound(env) {
   try {
     // 尝试使用全局变量访问KV
     if (typeof DOMAIN_MONITOR !== 'undefined') {
-      // 尝试读取一个键来验证KV是否可用
-      await DOMAIN_MONITOR.get('test_key');
+      // 只检查KV对象是否存在，不尝试读取键
       return true;
     }
     
     // 如果提供了env参数，尝试通过env访问KV
     if (env && env.DOMAIN_MONITOR) {
-      // 尝试读取一个键来验证KV是否可用
-      await env.DOMAIN_MONITOR.get('test_key');
+      // 只检查KV对象是否存在，不尝试读取键
       return true;
     }
     
