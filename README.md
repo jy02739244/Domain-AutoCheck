@@ -1,4 +1,4 @@
-# ![logo](./images/logo.png)CF-Domain-Autocheck
+# <img src="./images/logo.png" width="100" /> CF-Domain-Autocheck
 
 ## 🚨本项目主要是通过和Ai沟通创作而成，有能力者可自行进行完善或魔改🚨
 
@@ -9,7 +9,7 @@
 ## 💻界面展示
 <p align="center">
   <img src="./images/login.png" width="400" />
-  <img src="./images/webui.png" />
+  <img src="./images/webui.png" width="400" />
 </p>
 
 ## 🚀简易部署流程
