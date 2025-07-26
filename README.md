@@ -7,40 +7,10 @@
 * 主要功能：日期监控、价格记录、注册商记录、自定义标签、自定义续费链接、telegram提前通知。
 
 ## 💻界面展示
-<div align="center">
-  <table>
-    <tr>
-      <td width="50%">
-        <img src="https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-05-27.png" width="100%" />
-        <p align="center">图片1</p>
-      </td>
-      <td width="50%">
-        <img src="https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-03-45.png" width="100%" />
-        <p align="center">图片2</p>
-      </td>
-    </tr>
-    <tr>
-      <td width="50%">
-        <img src="https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-04-07.png" width="100%" />
-        <p align="center">图片3</p>
-      </td>
-      <td width="50%">
-        <img src="https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-05-42.png" width="100%" />
-        <p align="center">图片4</p>
-      </td>
-    </tr>
-    <tr>
-      <td width="50%">
-        <img src="https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-05-13.png" width="100%" />
-        <p align="center">图片5</p>
-      </td>
-      <td width="50%">
-        <img src="https://imgr2.952536.xyz/Hexo/Article/20250726233245913.png" width="100%" />
-        <p align="center">图片6</p>
-      </td>
-    </tr>
-  </table>
-</div>
+|                                                                           |                                                                           |                                                                           |
+|:-------------------------------------------------------------------------:|:-------------------------------------------------------------------------:|:-------------------------------------------------------------------------:|
+| ![](https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-05-27.png) | ![](https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-05-13.png) | ![](https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-05-42.png) |
+| ![](https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-04-07.png) | ![](https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-03-45.png) |     ![](https://imgr2.952536.xyz/Hexo/Article/20250726233245913.png)      |
 
 ## 🚀简易部署流程
 1. 创建workers/pages，wokers的话则粘贴代码，pages则fork仓库连接github
