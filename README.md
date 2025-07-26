@@ -8,7 +8,7 @@
 
 ## 💻界面展示
 <p align="center">
-  <img src="https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-04-07.png" width="400" />
+  <img src="https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-05-27.png" width="400" />
   <img src="https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-03-45.png" width="400" />
 </p>
 
