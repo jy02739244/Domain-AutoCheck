@@ -1,9 +1,4 @@
-<p align="center">
-  <h1 align="center">
-    <img src="./images/logo.png" width="70" align="top" />
-    CF-Domain-Autocheck
-  </h1>
-</p>
+# <img src="./images/logo.png" width="70" style="vertical-align: middle;"> CF-Domain-Autocheck
 
 ## 🚨本项目主要是通过和Ai沟通创作而成，有能力者可自行进行完善或魔改🚨
 
