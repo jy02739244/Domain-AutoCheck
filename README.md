@@ -1,4 +1,4 @@
-# <img src="./images/logo.png" width="70" align="left" style="margin-right:2px;">CF-Domain-Autocheck
+# <img src="./images/logo.png" width="70" align="left" style="margin-right:2px;"> CF-Domain-Autocheck
 
 ## 🚨本项目主要是通过和Ai沟通创作而成，有能力者可自行进行完善或魔改🚨
 
