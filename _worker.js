@@ -50,8 +50,8 @@ const ICONFONT_CSS = '//at.alicdn.com/t/c/font_4973034_ehjc2dhuu76.css';
 const ICONFONT_JS = '//at.alicdn.com/t/c/font_4973034_ehjc2dhuu76.js';
 
 // 网站图标和背景图片，可在环境变量中设置
-const DEFAULT_LOGO = 'https://imgr2.952536.xyz/Hexo/Article/domain-outline.png'; // 默认Logo图片，外置变量名为LOGO_URL
-const DEFAULT_BACKGROUND = 'https://nzr2.952536.xyz/Cover/bujidao-street.png'; // 默认背景图片，外置变量名为BACKGROUND_URL
+const DEFAULT_LOGO = 'https://imgr2.952536.xyz/Hexo/Decoration/domain-outline.png'; // 默认Logo图片，外置变量名为LOGO_URL
+const DEFAULT_BACKGROUND = 'https://imgr2.952536.xyz/Hexo/Wallpaper/bujidao-street.png'; // 默认背景图片，外置变量名为BACKGROUND_URL
 
 // 登录密码设置
 const DEFAULT_TOKEN = ''; // 在此处设置默认密码，留空则使用'domain'，外置变量名为TOKEN
