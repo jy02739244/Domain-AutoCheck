@@ -4207,13 +4207,3 @@ export default {
     return await checkExpiringDomains();
   }
 };
-
-// 为Node.js环境提供导出 - 使用更安全的检测方式
-if (typeof globalThis !== 'undefined' && 
-    typeof globalThis.process === 'object' && 
-    typeof globalThis.process.versions === 'object' && 
-    typeof globalThis.process.versions.node !== 'undefined') {
-  // 只在真正的Node.js环境中执行
-  exports.fetch = async (request) => await handleRequest(request);
-  exports.scheduled = async () => await checkExpiringDomains();
-}
