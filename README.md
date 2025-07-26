@@ -1,4 +1,4 @@
-# CF-Domain-Autocheck
+# ![logo](./images/logo.png)CF-Domain-Autocheck
 
 ## 🚨本项目主要是通过和Ai沟通创作而成，有能力者可自行进行完善或魔改🚨
 
