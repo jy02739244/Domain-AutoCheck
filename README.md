@@ -7,7 +7,7 @@
 * 主要功能：日期监控、价格记录、注册商记录、自定义标签、自定义续费链接、telegram提前通知。
 
 ## 💻界面展示
-<p align="center">
+<p>
   <img src="https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-05-27.png" width="400" />
   <img src="https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-03-45.png" width="400" />
   <img src="https://imgr2.952536.xyz/Hexo/Article/20250727002537067.png" width="400" />
