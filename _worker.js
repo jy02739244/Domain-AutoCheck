@@ -3228,10 +3228,287 @@ const getHTMLContent = (title) => `
     </html>
 `;
 
+// 添加KV检测提示页面模板
+const getKvSetupHTML = (title) => `
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title} - 配置指引</title>
+    <!-- 添加网站图标(favicon) -->
+    <link rel="icon" href="${typeof LOGO_URL !== 'undefined' ? LOGO_URL : DEFAULT_LOGO}" type="image/png">
+    <link rel="shortcut icon" href="${typeof LOGO_URL !== 'undefined' ? LOGO_URL : DEFAULT_LOGO}" type="image/png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- 添加阿里巴巴iconfont图标库支持 -->
+    <link rel="stylesheet" href="${ICONFONT_CSS}">
+    <!-- 确保图标正确加载 -->
+    <script src="${ICONFONT_JS}"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            background-image: url('${typeof BACKGROUND_URL !== 'undefined' ? BACKGROUND_URL : DEFAULT_BACKGROUND}');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.4);
+            z-index: 1;
+        }
+        
+        .setup-container {
+            background-color: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border-radius: 16px;
+            padding: 35px;
+            width: 90%;
+            max-width: 650px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            position: relative;
+            z-index: 10;
+            color: white;
+        }
+        
+        .setup-title {
+            text-align: center;
+            color: #ffffff;
+            margin-bottom: 25px;
+            font-weight: 600;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .setup-logo {
+            height: 80px;
+            width: 80px;
+            margin-bottom: 15px;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+        }
+        
+        .step {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .step-number {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            background-color: rgba(53, 83, 248, 0.9);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 28px;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        
+        .step-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+        
+        .step-content {
+            margin-left: 38px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .code-block {
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+        
+        .refresh-btn {
+            background-color: rgba(53, 83, 248, 0.9);
+            border: none;
+            color: white;
+            padding: 12px 20px;
+            font-weight: 500;
+            font-size: 1.05rem;
+            border-radius: 10px;
+            margin-top: 20px;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            display: block;
+            width: 100%;
+            text-align: center;
+            text-decoration: none;
+        }
+        
+        .refresh-btn:hover {
+            background-color: rgba(99, 122, 250, 0.8);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+            color: white;
+        }
+        
+        .note {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 15px;
+            text-align: center;
+            font-style: italic;
+        }
+        
+        .iconfont {
+            margin-right: 5px;
+        }
+        
+        /* 高亮代码样式 */
+        .highlight-code {
+            color:rgb(9, 255, 0);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="setup-container">
+        <div class="setup-title">
+            <img src="${typeof LOGO_URL !== 'undefined' ? LOGO_URL : DEFAULT_LOGO}" alt="Logo" class="setup-logo">
+            <h2>${title} - 初始配置</h2>
+        </div>
+        
+        <div class="step">
+            <div class="step-title"><span class="step-number">1</span>创建KV命名空间</div>
+            <div class="step-content">
+                <p>请在Cloudflare Dashboard中创建一个名为<strong>DOMAIN_MONITOR</strong>的KV命名空间：</p>
+                <ol>
+                    <li>登录Cloudflare Dashboard</li>
+                    <li>选择您的Workers & Pages项目</li>
+                    <li>点击"KV"选项卡</li>
+                    <li>点击"创建命名空间"按钮</li>
+                    <li>输入命名空间名称：<code class="highlight-code">DOMAIN_MONITOR</code></li>
+                    <li>点击"添加"按钮</li>
+                </ol>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-title"><span class="step-number">2</span>绑定KV到您的Worker/Pages</div>
+            <div class="step-content">
+                <p>将KV命名空间绑定到您的Worker或Pages项目：</p>
+                <ol>
+                    <li>在Workers或Pages设置中找到"变量"选项卡</li>
+                    <li>找到"KV命名空间绑定"部分</li>
+                    <li>点击"添加绑定"按钮</li>
+                    <li>变量名称填写：<code class="highlight-code">DOMAIN_MONITOR</code></li>
+                    <li>选择您刚创建的KV命名空间</li>
+                    <li>点击"保存"按钮</li>
+                </ol>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-title"><span class="step-number">3</span>设置访问密码（可选）</div>
+            <div class="step-content">
+                <p>您可以在环境变量中设置访问密码：</p>
+                <ol>
+                    <li>在Workers或Pages设置中找到"变量"选项卡</li>
+                    <li>找到"环境变量"部分</li>
+                    <li>点击"添加变量"按钮</li>
+                    <li>变量名称填写：<code class="highlight-code">TOKEN</code></li>
+                    <li>变量值填写您想设置的密码</li>
+                    <li>点击"保存"按钮</li>
+                </ol>
+                <p class="note">如果不设置，默认密码为：<code class="highlight-code">domain</code></p>
+            </div>
+        </div>
+        
+        <a href="javascript:window.location.reload()" class="refresh-btn">
+            <i class="iconfont icon-refresh"></i> 完成设置后点击刷新
+        </a>
+        
+        <p class="note">完成以上步骤后，刷新页面即可进入系统。</p>
+    </div>
+</body>
+</html>
+`;
+
+// 检测KV是否绑定
+async function isKvBound(env) {
+  try {
+    // 尝试使用全局变量访问KV
+    if (typeof DOMAIN_MONITOR !== 'undefined') {
+      // 尝试读取一个键来验证KV是否可用
+      await DOMAIN_MONITOR.get('test_key');
+      return true;
+    }
+    
+    // 如果提供了env参数，尝试通过env访问KV
+    if (env && env.DOMAIN_MONITOR) {
+      // 尝试读取一个键来验证KV是否可用
+      await env.DOMAIN_MONITOR.get('test_key');
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('KV访问错误:', error);
+    return false;
+  }
+}
+
 // 处理请求
-async function handleRequest(request) {
+async function handleRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
+  
+  // 检查KV是否绑定
+  const kvBound = await isKvBound(env);
+  
+  // 如果KV未绑定，显示设置指引页面
+  if (!kvBound) {
+    // 获取标题
+    let siteTitle = '域名到期监控';
+    if (typeof SITE_NAME !== 'undefined' && SITE_NAME) {
+      siteTitle = SITE_NAME;
+    } else if (DEFAULT_SITE_NAME) {
+      siteTitle = DEFAULT_SITE_NAME;
+    }
+    
+    const setupHtml = getKvSetupHTML(siteTitle);
+    return new Response(setupHtml, {
+      headers: {
+        'Content-Type': 'text/html;charset=UTF-8',
+      },
+    });
+  }
+  
+  // 使用正确的KV引用
+  const domainMonitorKV = env && env.DOMAIN_MONITOR ? env.DOMAIN_MONITOR : DOMAIN_MONITOR;
   
   // 获取标题
   // 优先级：环境变量 > 代码变量 > 默认值'域名到期监控'
@@ -3340,7 +3617,7 @@ async function handleRequest(request) {
       return jsonResponse({ error: '未授权访问', success: false }, 401);
     }
     
-    return await handleApiRequest(request);
+    return await handleApiRequest(request, env);
   }
   
   // 如果都不匹配，返回登录页面
@@ -3352,17 +3629,15 @@ async function handleRequest(request) {
   });
 }
 
-
-
 // 处理API请求
-async function handleApiRequest(request) {
+async function handleApiRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
   
   // 获取所有域名
   if (path === '/api/domains' && request.method === 'GET') {
     try {
-      const domains = await getDomains();
+      const domains = await getDomains(env);
       return jsonResponse(domains);
     } catch (error) {
       return jsonResponse({ error: '获取域名列表失败' }, 500);
@@ -3373,7 +3648,7 @@ async function handleApiRequest(request) {
   if (path === '/api/domains' && request.method === 'POST') {
     try {
       const domainData = await request.json();
-      const domain = await addDomain(domainData);
+      const domain = await addDomain(domainData, env);
       return jsonResponse(domain, 201);
     } catch (error) {
       return jsonResponse({ error: '添加域名失败' }, 400);
@@ -3385,7 +3660,7 @@ async function handleApiRequest(request) {
     const id = path.split('/').pop();
     try {
       const domainData = await request.json();
-      const domain = await updateDomain(id, domainData);
+      const domain = await updateDomain(id, domainData, env);
       return jsonResponse(domain);
     } catch (error) {
       return jsonResponse({ error: '更新域名失败' }, 400);
@@ -3396,7 +3671,7 @@ async function handleApiRequest(request) {
   if (path.match(/^\/api\/domains\/[^\/]+$/) && request.method === 'DELETE') {
     const id = path.split('/').pop();
     try {
-      await deleteDomain(id);
+      await deleteDomain(id, env);
       return jsonResponse({ success: true });
     } catch (error) {
       return jsonResponse({ error: '删除域名失败' }, 400);
@@ -3408,7 +3683,7 @@ async function handleApiRequest(request) {
     const id = path.split('/')[3];
     try {
       const renewData = await request.json();
-      const domain = await renewDomain(id, renewData);
+      const domain = await renewDomain(id, renewData, env);
       return jsonResponse(domain);
     } catch (error) {
       return jsonResponse({ error: '域名续期失败' }, 400);
@@ -3418,7 +3693,7 @@ async function handleApiRequest(request) {
   // 获取Telegram配置
   if (path === '/api/telegram/config' && request.method === 'GET') {
     try {
-      const config = await getTelegramConfig();
+      const config = await getTelegramConfig(env);
       return jsonResponse(config);
     } catch (error) {
       return jsonResponse({ error: '获取Telegram配置失败' }, 500);
@@ -3430,7 +3705,7 @@ async function handleApiRequest(request) {
     try {
       const configData = await request.json();
       console.log('保存Telegram配置:', JSON.stringify(configData));
-      const config = await saveTelegramConfig(configData);
+      const config = await saveTelegramConfig(configData, env);
       console.log('保存成功，返回配置:', JSON.stringify(config));
       return jsonResponse(config);
     } catch (error) {
@@ -3442,7 +3717,7 @@ async function handleApiRequest(request) {
   // 测试Telegram通知
   if (path === '/api/telegram/test' && request.method === 'POST') {
     try {
-      const result = await testTelegramNotification();
+      const result = await testTelegramNotification(env);
       return jsonResponse(result);
     } catch (error) {
       return jsonResponse({ error: '测试Telegram通知失败: ' + error.message }, 400);
@@ -3453,7 +3728,7 @@ async function handleApiRequest(request) {
   if (path.match(/^\/api\/domains\/[^\/]+\/test-notify$/) && request.method === 'POST') {
     const id = path.split('/')[3];
     try {
-      const result = await testSingleDomainNotification(id);
+      const result = await testSingleDomainNotification(id, env);
       return jsonResponse(result);
     } catch (error) {
       return jsonResponse({ error: '测试通知失败: ' + error.message }, 400);
@@ -3465,14 +3740,15 @@ async function handleApiRequest(request) {
 }
 
 // 获取所有域名
-async function getDomains() {
-  const domainsStr = await DOMAIN_MONITOR.get('domains') || '[]';
+async function getDomains(env) {
+  const domainMonitorKV = env && env.DOMAIN_MONITOR ? env.DOMAIN_MONITOR : DOMAIN_MONITOR;
+  const domainsStr = await domainMonitorKV.get('domains') || '[]';
   return JSON.parse(domainsStr);
 }
 
 // 添加新域名
-async function addDomain(domainData) {
-  const domains = await getDomains();
+async function addDomain(domainData, env) {
+  const domains = await getDomains(env);
   
   // 验证域名数据
   if (!domainData.name || !domainData.expiryDate) {
@@ -3504,14 +3780,15 @@ async function addDomain(domainData) {
         domains.push(domainData);
         
         // 保存到KV
-        await DOMAIN_MONITOR.put('domains', JSON.stringify(domains));
+        const domainMonitorKV = env && env.DOMAIN_MONITOR ? env.DOMAIN_MONITOR : DOMAIN_MONITOR;
+        await domainMonitorKV.put('domains', JSON.stringify(domains));
         
         return domainData;
 }
 
 // 更新域名
-async function updateDomain(id, domainData) {
-  const domains = await getDomains();
+async function updateDomain(id, domainData, env) {
+  const domains = await getDomains(env);
   
   // 查找域名索引
   const index = domains.findIndex(d => d.id === id);
@@ -3559,14 +3836,15 @@ async function updateDomain(id, domainData) {
   };
   
   // 保存到KV
-  await DOMAIN_MONITOR.put('domains', JSON.stringify(domains));
+  const domainMonitorKV = env && env.DOMAIN_MONITOR ? env.DOMAIN_MONITOR : DOMAIN_MONITOR;
+  await domainMonitorKV.put('domains', JSON.stringify(domains));
   
   return domains[index];
 }
 
 // 删除域名
-async function deleteDomain(id) {
-  const domains = await getDomains();
+async function deleteDomain(id, env) {
+  const domains = await getDomains(env);
   
   // 过滤掉要删除的域名
   const newDomains = domains.filter(d => d.id !== id);
@@ -3577,14 +3855,15 @@ async function deleteDomain(id) {
   }
   
   // 保存到KV
-  await DOMAIN_MONITOR.put('domains', JSON.stringify(newDomains));
+  const domainMonitorKV = env && env.DOMAIN_MONITOR ? env.DOMAIN_MONITOR : DOMAIN_MONITOR;
+  await domainMonitorKV.put('domains', JSON.stringify(newDomains));
   
   return true;
 }
 
 // 域名续期
-async function renewDomain(id, renewData) {
-  const domains = await getDomains();
+async function renewDomain(id, renewData, env) {
+  const domains = await getDomains(env);
   
   // 查找域名索引
   const index = domains.findIndex(d => d.id === id);
@@ -3620,15 +3899,17 @@ async function renewDomain(id, renewData) {
     } // 记录本次续期周期，用于进度条计算
   };
   
-  // 保存到KV
-  await DOMAIN_MONITOR.put('domains', JSON.stringify(domains));
-  
-  return domains[index];
+      // 保存到KV
+    const domainMonitorKV = env && env.DOMAIN_MONITOR ? env.DOMAIN_MONITOR : DOMAIN_MONITOR;
+    await domainMonitorKV.put('domains', JSON.stringify(domains));
+    
+    return domains[index];
 }
 
 // 获取Telegram配置
-async function getTelegramConfig() {
-  const configStr = await DOMAIN_MONITOR.get('telegram_config') || '{}';
+async function getTelegramConfig(env) {
+  const domainMonitorKV = env && env.DOMAIN_MONITOR ? env.DOMAIN_MONITOR : DOMAIN_MONITOR;
+  const configStr = await domainMonitorKV.get('telegram_config') || '{}';
   const config = JSON.parse(configStr);
   
   // 检查是否使用环境变量
@@ -3671,7 +3952,7 @@ async function getTelegramConfig() {
 }
 
 // 保存Telegram配置
-async function saveTelegramConfig(configData) {
+async function saveTelegramConfig(configData, env) {
   // 验证必要的配置 - 只有当启用Telegram通知且环境变量中也没有配置时才需要验证
   if (configData.enabled) {
     // 检查是否可以使用环境变量或用户输入的值
@@ -3699,7 +3980,8 @@ async function saveTelegramConfig(configData) {
     notifyDays: configData.notifyDays || 30,
   };
   
-  await DOMAIN_MONITOR.put('telegram_config', JSON.stringify(config));
+  const domainMonitorKV = env && env.DOMAIN_MONITOR ? env.DOMAIN_MONITOR : DOMAIN_MONITOR;
+  await domainMonitorKV.put('telegram_config', JSON.stringify(config));
   
   // 检查是否使用环境变量
   // 当环境变量存在且配置中的值为undefined、null或空字符串时，视为使用环境变量
@@ -3741,8 +4023,8 @@ async function saveTelegramConfig(configData) {
 }
 
 // 测试Telegram通知
-async function testTelegramNotification() {
-  const config = await getTelegramConfigWithToken();
+async function testTelegramNotification(env) {
+  const config = await getTelegramConfigWithToken(env);
   
   if (!config.enabled) {
     throw new Error('Telegram通知未启用');
@@ -3763,8 +4045,9 @@ async function testTelegramNotification() {
 }
 
 // 获取完整的Telegram配置（包括token）
-async function getTelegramConfigWithToken() {
-  const configStr = await DOMAIN_MONITOR.get('telegram_config') || '{}';
+async function getTelegramConfigWithToken(env) {
+  const domainMonitorKV = env && env.DOMAIN_MONITOR ? env.DOMAIN_MONITOR : DOMAIN_MONITOR;
+  const configStr = await domainMonitorKV.get('telegram_config') || '{}';
   const config = JSON.parse(configStr);
   
   // 如果KV中没有token或chatId，或者是空字符串，但环境变量中有值，则使用环境变量中的值
@@ -3875,12 +4158,12 @@ function jsonResponse(data, status = 200) {
 }
 
 // 设置定时任务，检查即将到期的域名并发送通知
-async function checkExpiringDomains() {
-  const domains = await getDomains();
+async function checkExpiringDomains(env) {
+  const domains = await getDomains(env);
   const today = new Date();
   
   // 获取Telegram配置
-  const telegramConfig = await getTelegramConfigWithToken();
+  const telegramConfig = await getTelegramConfigWithToken(env);
   const globalNotifyDays = telegramConfig.enabled ? telegramConfig.notifyDays : 30;
   
   // 筛选出即将到期和已过期的域名
@@ -3986,9 +4269,9 @@ async function sendExpiringDomainsNotification(config, domains, isExpired) {
 }
 
 // 添加测试单个域名通知的后端函数
-async function testSingleDomainNotification(id) {
+async function testSingleDomainNotification(id, env) {
   // 获取域名信息
-  const domains = await getDomains();
+  const domains = await getDomains(env);
   const domain = domains.find(d => d.id === id);
   
   if (!domain) {
@@ -3996,7 +4279,7 @@ async function testSingleDomainNotification(id) {
   }
   
   // 获取Telegram配置
-  const telegramConfig = await getTelegramConfigWithToken();
+  const telegramConfig = await getTelegramConfigWithToken(env);
   
   if (!telegramConfig.enabled) {
     throw new Error('Telegram通知未启用');
@@ -4201,9 +4484,9 @@ async function addFooterToResponse(response) {
 // 添加对Pages的支持
 export default {
   async fetch(request, env, ctx) {
-    return await handleRequest(request);
+    return await handleRequest(request, env);
   },
   async scheduled(controller, env, ctx) {
-    return await checkExpiringDomains();
+    return await checkExpiringDomains(env);
   }
 };
