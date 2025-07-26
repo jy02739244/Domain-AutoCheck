@@ -501,8 +501,10 @@ const getHTMLContent = (title) => `
             justify-content: center;
             flex: 1;
             min-width: 0; /* 解决flex子项目溢出问题 */
+            max-width: calc(100% - 2px); /* 限制最大宽度，为右侧状态标签留出空间 */
             overflow: hidden; /* 确保内容不会溢出 */
             padding-left: 5px; /* 与小圆点的间距 */
+            padding-right: 2px; /* 与右侧状态标签的间距 */
             transition: all 0.3s ease; /* 添加过渡效果 */
             min-height: 60px; /* 最小高度，可根据内容自动增加 */
             height: auto; /* 自动调整高度以适应内容 */
@@ -632,14 +634,15 @@ const getHTMLContent = (title) => `
         }
         
         /* 状态区域 */
-        .domain-status {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            flex-shrink: 0; /* 防止被压缩 */
-            min-width: 120px; /* 设置最小宽度 */
-            padding-right: 20px; /* 下拉按钮与卡片右边的间距 */
-        }
+.domain-status {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-shrink: 0; /* 防止被压缩 */
+    min-width: 100px; /* 增加最小宽度，确保状态标签有足够空间 */
+    padding-right: 20px; /* 下拉按钮与卡片右边的间距 */
+    margin-left: 10px; /* 与域名区域的间距 */
+}
         
         .domain-status .badge {
             margin-right: 10px; /* 与下拉箭头的间距 */
@@ -1537,6 +1540,9 @@ const getHTMLContent = (title) => `
                         <i class="iconfont icon-paixu" style="color: white;"></i> <span style="color: white;">域名排序</span>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="sortDropdown">
+                        <li><a class="dropdown-item sort-option" data-sort="suffix" data-order="asc" href="#"><i class="iconfont icon-gou1 sort-check"></i> 按域名后缀升序</a></li>
+                        <li><a class="dropdown-item sort-option" data-sort="suffix" data-order="desc" href="#"><i class="iconfont icon-gou1 sort-check"></i> 按域名后缀降序</a></li>
+                        <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item sort-option" data-sort="name" data-order="asc" href="#"><i class="iconfont icon-gou1 sort-check"></i> 按域名升序</a></li>
                         <li><a class="dropdown-item sort-option" data-sort="name" data-order="desc" href="#"><i class="iconfont icon-gou1 sort-check"></i> 按域名降序</a></li>
                         <li><hr class="dropdown-divider"></li>
@@ -1794,7 +1800,7 @@ const getHTMLContent = (title) => `
         let domains = [];
         let currentDomainId = null;
         let telegramConfig = {};
-        let currentSortField = 'name'; // 默认排序字段改为域名
+        let currentSortField = 'suffix'; // 默认排序字段改为域名后缀
         let currentSortOrder = 'asc'; // 默认排序顺序
         let viewMode = 'auto-collapse'; // 默认查看模式：auto-collapse (自动折叠), expand-all (全部展开), collapse-all (全部折叠)
         
@@ -2103,6 +2109,14 @@ const getHTMLContent = (title) => `
                 
                 // 设置默认选项为激活状态
                 defaultSortOption.classList.add('active');
+            } else {
+                // 如果找不到匹配的选项，默认选择按后缀升序
+                const suffixAscOption = document.querySelector('.sort-option[data-sort="suffix"][data-order="asc"]');
+                if (suffixAscOption) {
+                    suffixAscOption.classList.add('active');
+                    currentSortField = 'suffix';
+                    currentSortOrder = 'asc';
+                }
             }
             
             // 表头排序点击事件
@@ -3192,6 +3206,14 @@ const getHTMLContent = (title) => `
                                 valueA = a.name.toLowerCase();
                                 valueB = b.name.toLowerCase();
                                 break;
+                            case 'suffix':
+                                // 获取域名后缀并反转字符串用于排序（从后往前排序）
+                                const getSuffixForSort = (domain) => {
+                                    return domain.toLowerCase().split('').reverse().join('');
+                                };
+                                valueA = getSuffixForSort(a.name);
+                                valueB = getSuffixForSort(b.name);
+                                break;
                             case 'customNote':
                                 valueA = (a.customNote || '').toLowerCase();
                                 valueB = (b.customNote || '').toLowerCase();
@@ -3232,6 +3254,21 @@ const getHTMLContent = (title) => `
 async function handleRequest(request) {
   const url = new URL(request.url);
   const path = url.pathname;
+  
+  // 检查是否已配置KV空间
+  if (!isKVConfigured()) {
+    // 如果请求是"完成设置"按钮的操作
+    if (path === '/setup-complete') {
+      return Response.redirect(url.origin, 302);
+    }
+    
+    // 显示设置向导页面
+    return new Response(getSetupHTML(), {
+      headers: {
+        'Content-Type': 'text/html;charset=UTF-8',
+      },
+    });
+  }
   
   // 获取标题
   // 优先级：环境变量 > 代码变量 > 默认值'域名到期监控'
@@ -4250,3 +4287,140 @@ export default {
     return checkExpiringDomains();
   }
 };
+
+// 检查是否已配置KV
+function isKVConfigured() {
+  return typeof DOMAIN_MONITOR !== 'undefined';
+}
+
+// 获取配置向导HTML
+function getSetupHTML() {
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>域名监控系统 - 配置向导</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background-color: #f8f9fa;
+      padding: 20px;
+    }
+    .setup-container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .step {
+      margin-bottom: 20px;
+      padding: 15px;
+      border-left: 4px solid #4e54c8;
+      background-color: #f8f9fa;
+    }
+    .step-number {
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      background-color: #4e54c8;
+      color: white;
+      text-align: center;
+      line-height: 30px;
+      border-radius: 50%;
+      margin-right: 10px;
+    }
+    code {
+      background-color: #f1f1f1;
+      padding: 2px 5px;
+      border-radius: 3px;
+    }
+    img {
+      max-width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin: 10px 0;
+    }
+    .alert {
+      margin-top: 20px;
+    }
+    .btn-primary {
+      background-color: #4e54c8;
+      border-color: #4e54c8;
+    }
+    .btn-primary:hover {
+      background-color: #3f44ae;
+      border-color: #3f44ae;
+    }
+  </style>
+</head>
+<body>
+  <div class="setup-container">
+    <h1 class="mb-4">域名监控系统 - 配置向导</h1>
+    
+    <div class="alert alert-warning">
+      <strong>提示：</strong> 检测到您尚未完成必要的配置。请按照以下步骤设置您的域名监控系统。
+    </div>
+    
+    <div class="step">
+      <h3><span class="step-number">1</span> 创建KV命名空间</h3>
+      <p>首先，您需要创建一个KV命名空间来存储域名数据：</p>
+      <ol>
+        <li>登录到 <a href="https://dash.cloudflare.com/" target="_blank">Cloudflare仪表板</a></li>
+        <li>选择您的账户，然后点击<strong>Workers & Pages</strong></li>
+        <li>在左侧菜单中，点击<strong>KV</strong></li>
+        <li>点击<strong>创建命名空间</strong>按钮</li>
+        <li>输入命名空间名称，例如：<code>domain-monitor</code></li>
+        <li>点击<strong>添加</strong>按钮完成创建</li>
+      </ol>
+    </div>
+    
+    <div class="step">
+      <h3><span class="step-number">2</span> 绑定KV命名空间到您的项目</h3>
+      <p>接下来，您需要将创建的KV命名空间绑定到您的Workers或Pages项目：</p>
+      
+      <h4>对于Workers项目：</h4>
+      <ol>
+        <li>在Workers & Pages页面，点击您的Workers项目</li>
+        <li>点击<strong>设置</strong>标签，然后选择<strong>变量</strong></li>
+        <li>在<strong>KV命名空间绑定</strong>部分，点击<strong>添加绑定</strong></li>
+        <li>变量名设置为：<code>DOMAIN_MONITOR</code>（必须使用此名称）</li>
+        <li>KV命名空间选择您刚才创建的命名空间</li>
+        <li>点击<strong>保存</strong>按钮</li>
+      </ol>
+      
+      <h4>对于Pages项目：</h4>
+      <ol>
+        <li>在Workers & Pages页面，点击您的Pages项目</li>
+        <li>点击<strong>设置</strong>标签，然后选择<strong>函数</strong></li>
+        <li>在<strong>KV命名空间绑定</strong>部分，点击<strong>添加绑定</strong></li>
+        <li>变量名设置为：<code>DOMAIN_MONITOR</code>（必须使用此名称）</li>
+        <li>KV命名空间选择您刚才创建的命名空间</li>
+        <li>点击<strong>保存</strong>按钮</li>
+      </ol>
+    </div>
+    
+    <div class="step">
+      <h3><span class="step-number">3</span> 设置环境变量（可选）</h3>
+      <p>您可以设置以下环境变量来自定义您的域名监控系统：</p>
+      <ul>
+        <li><code>TOKEN</code> - 登录密码，如果不设置则默认使用"domain"</li>
+        <li><code>SITE_NAME</code> - 网站标题</li>
+        <li><code>LOGO_URL</code> - 自定义Logo图片URL</li>
+        <li><code>BACKGROUND_URL</code> - 自定义背景图片URL</li>
+        <li><code>TG_TOKEN</code> - Telegram机器人Token</li>
+        <li><code>TG_ID</code> - Telegram聊天ID</li>
+      </ul>
+      <p>在Workers或Pages的<strong>设置 > 变量</strong>部分添加这些环境变量。</p>
+    </div>
+    
+    <div class="text-center mt-4">
+      <a href="/setup-complete" class="btn btn-primary btn-lg">我已完成设置，刷新页面</a>
+    </div>
+  </div>
+</body>
+</html>`;
+}
