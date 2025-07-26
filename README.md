@@ -1,8 +1,4 @@
-# CF-Domain-Autocheck
-
-<img src="./images/logo.png" width="40" align="left" style="margin-right:10px;">
-
-A tool for checking Cloudflare domains.
+# <img src="./images/logo.png" width="40" align="left" style="margin-right:10px;"> CF-Domain-Autocheck
 
 ## 🚨本项目主要是通过和Ai沟通创作而成，有能力者可自行进行完善或魔改🚨
 
