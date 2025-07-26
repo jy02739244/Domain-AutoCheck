@@ -7,7 +7,38 @@
 * 主要功能：日期监控、价格记录、注册商记录、自定义标签、自定义续费链接、telegram提前通知。
 
 ## 💻界面展示
-![](https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-05-27.png)![](https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-03-45.png)![](https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-04-07.png)![](https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-05-42.png)![](https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-05-13.png)![](https://imgr2.952536.xyz/Hexo/Article/20250726233245913.png)
+<div style="overflow: hidden; width: 300px; height: 200px;">
+  <div style="display: flex; transition: transform 0.5s;">
+    <img url="https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-05-27.png" style="width: 300px; height: 200px;">
+    <img url="https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-05-13.png" style="width: 300px; height: 200px;">
+    <img url="https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-04-07.png" style="width: 300px; height: 200px;">
+    <img url="https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-05-42.png" style="width: 300px; height: 200px;">
+    <img url="https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-03-45.png" style="width: 300px; height: 200px;">
+    <img url="https://imgr2.952536.xyz/Hexo/Article/20250726233245913.png" style="width: 300px; height: 200px;">
+  </div>
+</div>
+<button onclick="prevSlide()">Previous</button>
+<button onclick="nextSlide()">Next</button>
+
+<script>
+  let currentIndex = 0;
+  const slides = document.querySelectorAll('div > img');
+  
+  function showSlide(index) {
+    const slideContainer = slides[0].parentElement;
+    slideContainer.style.transform = `translateX(-${index * 300}px)`;
+  }
+
+  function nextSlide() {
+    currentIndex = (currentIndex + 1) % slides.length;
+    showSlide(currentIndex);
+  }
+
+  function prevSlide() {
+    currentIndex = (currentIndex - 1 + slides.length) % slides.length;
+    showSlide(currentIndex);
+  }
+</script>
 
 ## 🚀简易部署流程
 1. 创建workers/pages，wokers的话则粘贴代码，pages则fork仓库连接github
