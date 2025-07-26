@@ -12,7 +12,7 @@
   <img src="https://imgr2.952536.xyz/Hexo/Article/PixPin_2025-07-26_23-03-45.png" width="400" />
 </p>
 
-## 🚀简易部署流程
+## 🚀简易部署流程，若需要详细流程，请移步👉[Faiz博客](https://blog.faiz.hidns.co/2025/07/26/Domain-AutoCheck%E5%9F%9F%E5%90%8D%E5%88%B0%E6%9C%9F%E7%9B%91%E6%8E%A7/)
 1. 创建workers/pages，wokers的话则粘贴代码，pages则fork仓库连接github
 2. 创建一个KV，名字可以随便取
 3. 绑定KV，变量名称：`DOMAIN_MONITOR`，注意大写，怕填错就复制粘贴，KV命名空间就下拉菜单选择刚才创建的KV名
@@ -29,5 +29,3 @@
     | SITE_NAME      | 默认为域名到期监控                                                       |  ❌️   | 不填，默认就是域名到期监控               |
     | LOGO_URL       | https://123abc.com/logo.svg                                              |  ❌️   | 网站logo，有需要可自行设置               |
     | BACKGROUND_URL | https://123abc.com/img.jpg                                               |  ❌️   | 背景图，有需要的可以自己设置             |
-
-## ✍️详细部署流程，请移步👉[Faiz博客](https://blog.faiz.hidns.co/2025/07/26/Domain-AutoCheck%E5%9F%9F%E5%90%8D%E5%88%B0%E6%9C%9F%E7%9B%91%E6%8E%A7/)
