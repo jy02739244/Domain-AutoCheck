@@ -1576,16 +1576,17 @@ const getHTMLContent = (title) => `
                     <form id="addDomainForm">
                         <input type="hidden" id="domainId" value="">
                         <div class="mb-3">
-                            <label for="domainName" class="form-label"><i class="iconfont icon-earth-full"></i> 域名</label>
+                            <label for="domainName" class="form-label"><i class="iconfont icon-earth-full"></i> 域名(必填)</label>
                             <input type="text" class="form-control" id="domainName" placeholder="请输入域名，如example.com" required>
                         </div>
                         <div class="mb-3">
-                            <label for="registrar" class="form-label"><i class="iconfont icon-house-chimney"></i> 注册商</label>
+                            <label for="registrar" class="form-label"><i class="iconfont icon-house-chimney"></i> 注册商(可选)</label>
                             <input type="text" class="form-control" id="registrar" placeholder="请输入注册商名称，如阿里云、腾讯云等">
+                            <div class="form-text">将用做分类标准，不填则归入默认分类</div>
                         </div>
                         <!-- 添加自定义备注字段 -->
                         <div class="mb-3">
-                            <label for="customNote" class="form-label"><i class="iconfont icon-tags"></i> 自定义备注</label>
+                            <label for="customNote" class="form-label"><i class="iconfont icon-tags"></i> 自定义备注(可选)</label>
                             <div class="input-group">
                                 <input type="text" class="form-control" id="customNote" placeholder="添加备注信息">
                                 <select class="form-select" id="noteColor" style="max-width: 120px;">
@@ -1605,18 +1606,18 @@ const getHTMLContent = (title) => `
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label for="registrationDate" class="form-label"><i class="iconfont icon-calendar-days"></i> 注册时间</label>
+                            <label for="registrationDate" class="form-label"><i class="iconfont icon-calendar-days"></i> 注册时间(必填)</label>
                             <input type="date" class="form-control" id="registrationDate">
-                            <div class="form-text">域名首次注册的时间（可选）</div>
+                            <div class="form-text">域名首次注册的时间</div>
                         </div>
                         <div class="mb-3">
-                            <label for="expiryDate" class="form-label"><i class="iconfont icon-calendar-days"></i> 到期日期</label>
+                            <label for="expiryDate" class="form-label"><i class="iconfont icon-calendar-days"></i> 到期日期(必填)</label>
                             <input type="date" class="form-control" id="expiryDate" required>
                         </div>
                         
                         <!-- 价格设置 -->
                         <div class="mb-3">
-                            <label for="price" class="form-label"><i class="iconfont icon-licai"></i> 价格</label>
+                            <label for="price" class="form-label"><i class="iconfont icon-licai"></i> 价格(可选)</label>
                             <div class="input-group">
                                 <select class="form-select" id="priceCurrency" style="max-width: 80px;">
                                     <option value="¥" selected>¥</option>
@@ -1632,12 +1633,12 @@ const getHTMLContent = (title) => `
                                     <option value="day">日</option>
                                 </select>
                             </div>
-                            <div class="form-text">域名的价格（可选）</div>
+                            <div class="form-text">域名的价格，支持多国货币</div>
                         </div>
                         
                         <!-- 续期周期设置 -->
                         <div class="mb-3">
-                            <label for="renewCycle" class="form-label"><i class="iconfont icon-repeat"></i> 续期周期</label>
+                            <label for="renewCycle" class="form-label"><i class="iconfont icon-repeat"></i> 续期周期(必填)</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" id="renewCycleValue" value="1" min="1" max="100">
                                 <select class="form-select" id="renewCycleUnit">
@@ -1651,9 +1652,9 @@ const getHTMLContent = (title) => `
                         
                         <!-- 添加续费链接字段 -->
                         <div class="mb-3">
-                            <label for="renewLink" class="form-label"><i class="iconfont icon-link"></i> 续费链接</label>
+                            <label for="renewLink" class="form-label"><i class="iconfont icon-link"></i> 续费链接(可选)</label>
                             <input type="url" class="form-control" id="renewLink" placeholder="https://example.com/renew">
-                            <div class="form-text">域名续费的直达链接（可选）</div>
+                            <div class="form-text">域名续费的直达链接</div>
                         </div>
                         
                         <!-- 上次续期时间设置 -->
@@ -3993,7 +3994,7 @@ async function sendExpiringDomainsNotification(config, domains, isExpired) {
   // 域名之间的短横线分隔符统一使用40个字符
   const domainSeparator = '----------------------------------------';
   
-  message = title + '\n' + separator + '\n\n';
+  let message = title + '\n' + separator + '\n\n';
   
   domains.forEach((domain, index) => {
     const expiryDate = new Date(domain.expiryDate);
@@ -4004,17 +4005,17 @@ async function sendExpiringDomainsNotification(config, domains, isExpired) {
       message += '\n' + domainSeparator + '\n\n';
     }
     
-    message += '🌍 <b>域名:</b> ' + domain.name + '\n\n';
+    message += '🌍 <b>域名:</b> ' + domain.name + '\n';
     if (domain.registrar) {
-      message += '🏬 <b>注册商:</b> ' + domain.registrar + '\n\n';
+      message += '🏬 <b>注册商:</b> ' + domain.registrar + '\n';
     }
-    message += '⏳ <b>剩余时间:</b> ' + daysLeft + ' 天\n\n';
-    message += '📅 <b>到期日期:</b> ' + formatDate(domain.expiryDate) + '\n\n';
+    message += '⏳ <b>剩余时间:</b> ' + daysLeft + ' 天\n';
+    message += '📅 <b>到期日期:</b> ' + formatDate(domain.expiryDate) + '\n';
     
     if (domain.renewLink) {
-      message += '⚠️ <b>点击续期:</b> ' + domain.renewLink + '\n\n';
+      message += '⚠️ <b>点击续期:</b> ' + domain.renewLink + '\n';
     } else {
-      message += '⚠️ <b>点击续期:</b> 未设置续期链接\n\n';
+      message += '⚠️ <b>点击续期:</b> 未设置续期链接\n';
     }
   });
   
@@ -4066,18 +4067,18 @@ async function testSingleDomainNotification(id) {
   
   let message = title + '\n' + separator + '\n\n';
   message += '这是一条测试通知，用于预览域名' + (isExpired ? '已过期' : '到期') + '提醒的格式：\n\n';
-  
-  message += '🌍 <b>域名:</b> ' + domain.name + '\n\n';
+
+  message += '🌍 <b>域名:</b> ' + domain.name + '\n';
   if (domain.registrar) {
-    message += '🏬 <b>注册商:</b> ' + domain.registrar + '\n\n';
+    message += '🏬 <b>注册商:</b> ' + domain.registrar + '\n';
   }
-  message += '⏳ <b>剩余时间:</b> ' + daysLeft + ' 天\n\n';
-  message += '📅 <b>到期日期:</b> ' + formatDate(domain.expiryDate) + '\n\n';
+  message += '⏳ <b>剩余时间:</b> ' + daysLeft + ' 天\n';
+  message += '📅 <b>到期日期:</b> ' + formatDate(domain.expiryDate) + '\n';
   
   if (domain.renewLink) {
-    message += '⚠️ <b>点击续期:</b> ' + domain.renewLink + '\n\n';
+    message += '⚠️ <b>点击续期:</b> ' + domain.renewLink + '\n';
   } else {
-    message += '⚠️ <b>点击续期:</b> 未设置续期链接\n\n';
+    message += '⚠️ <b>点击续期:</b> 未设置续期链接\n';
   }
   
   // 发送测试消息
