@@ -18,7 +18,6 @@
 3. 绑定KV，变量名称：`DOMAIN_MONITOR`，注意大写，怕填错就复制粘贴，KV命名空间就下拉菜单选择刚才创建的KV名
 4. 绑定自定义域名
 5. 设定环境变量，workers可以选择在代码中改也可以在cloudflare中改，pages在cloudflare的环境变量中改，cloudflare环境变量名如下：
-
     > <center> 🚨 所有的变量优先级都是：Cloudflare环境变量＞代码中的变量＞默认值 🚨 </center>
 
     | 名称           | 示例                                                                     | 必填 | 备注                                     |
