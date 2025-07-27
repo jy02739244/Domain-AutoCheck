@@ -19,6 +19,10 @@ const DEFAULT_TG_ID = '';    // 你的Telegram聊天ID，留空则尝试读取�
 // 网站标题配置
 const DEFAULT_SITE_NAME = ''; // 默认网站标题，外置环境变量名为SITE_NAME
 
+// Cron任务配置，如果是workers部署，这里就不用改动；如果是pages部署，就需要改动
+const DEFAULT_ENABLE_INTERNAL_CRON = true; // 是否启用内置cron任务，外置环境变量名为ENABLE_INTERNAL_CRON
+const DEFAULT_CRON_SECRET = ''; // 外部cron调用的安全密钥，留空则不验证，外置环境变量名为CRON_SECRET
+
 // 登录页HTML模板
 const getLoginHTML = (title) => `
 <!DOCTYPE html>
@@ -3497,6 +3501,33 @@ async function handleApiRequest(request) {
       return jsonResponse({ error: '测试通知失败: ' + error.message }, 400);
     }
   }
+
+  // 外部Cron触发器端点
+  if (path === '/api/cron-check' && request.method === 'POST') {
+    try {
+      // 可选：验证请求来源（如果设置了CRON_SECRET）
+      let cronSecret = '';
+      if (typeof CRON_SECRET !== 'undefined' && CRON_SECRET) {
+        cronSecret = CRON_SECRET;
+      } else if (DEFAULT_CRON_SECRET) {
+        cronSecret = DEFAULT_CRON_SECRET;
+      }
+      if (cronSecret) {
+        const authHeader = request.headers.get('Authorization');
+        const expectedAuth = 'Bearer ' + cronSecret;
+        if (authHeader !== expectedAuth) {
+          return jsonResponse({ error: 'Unauthorized' }, 401);
+        }
+      }
+
+      // 执行域名检查
+      await checkExpiringDomains();
+      return jsonResponse({ success: true, message: 'Cron job completed successfully' });
+    } catch (error) {
+      console.error('External cron job error:', error);
+      return jsonResponse({ error: 'Cron job failed: ' + error.message }, 500);
+    }
+  }
   
   // 404 - 路由不存在
   return jsonResponse({ error: '未找到请求的资源' }, 404);
@@ -4128,7 +4159,15 @@ addEventListener('fetch', event => {
 
 // 注册定时任务，每天检查一次
 addEventListener('scheduled', event => {
-  event.waitUntil(checkExpiringDomains());
+  // 检查是否启用内置cron任务
+  const enableInternalCron = typeof ENABLE_INTERNAL_CRON !== 'undefined' ?
+    ENABLE_INTERNAL_CRON : DEFAULT_ENABLE_INTERNAL_CRON;
+
+  if (enableInternalCron) {
+    event.waitUntil(checkExpiringDomains());
+  } else {
+    console.log('Internal cron is disabled, skipping scheduled task');
+  }
 });
 
 // 添加页面底部版权信息
@@ -4263,6 +4302,12 @@ export default {
       if (env.TG_ID) {
         globalThis.TG_ID = env.TG_ID;
       }
+      if (env.CRON_SECRET) {
+        globalThis.CRON_SECRET = env.CRON_SECRET;
+      }
+      if (env.ENABLE_INTERNAL_CRON !== undefined) {
+        globalThis.ENABLE_INTERNAL_CRON = env.ENABLE_INTERNAL_CRON;
+      }
     }
     
     // 使用相同的请求处理函数
@@ -4282,10 +4327,21 @@ export default {
       if (env.TG_ID) {
         globalThis.TG_ID = env.TG_ID;
       }
+      if (env.ENABLE_INTERNAL_CRON !== undefined) {
+        globalThis.ENABLE_INTERNAL_CRON = env.ENABLE_INTERNAL_CRON;
+      }
     }
-    
-    // 使用相同的定时任务处理函数
-    return checkExpiringDomains();
+
+    // 检查是否启用内置cron任务
+    const enableInternalCron = typeof ENABLE_INTERNAL_CRON !== 'undefined' ?
+      ENABLE_INTERNAL_CRON : DEFAULT_ENABLE_INTERNAL_CRON;
+
+    if (enableInternalCron) {
+      return checkExpiringDomains();
+    } else {
+      console.log('Internal cron is disabled, skipping scheduled task');
+      return Promise.resolve();
+    }
   }
 };
 
@@ -4414,6 +4470,8 @@ function getSetupHTML() {
         <li><code>BACKGROUND_URL</code> - 自定义背景图片URL</li>
         <li><code>TG_TOKEN</code> - Telegram机器人Token</li>
         <li><code>TG_ID</code> - Telegram聊天ID</li>
+        <li><code>ENABLE_INTERNAL_CRON</code> - 是否启用内置cron任务（true/false，默认true）</li>
+        <li><code>CRON_SECRET</code> - 外部cron调用的安全密钥（可选）</li>
       </ul>
       <p>在Workers或Pages的<strong>设置 > 变量</strong>部分添加这些环境变量。</p>
     </div>
