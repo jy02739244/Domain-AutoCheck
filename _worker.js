@@ -2459,7 +2459,7 @@ const getHTMLContent = (title) => `
                         statusClass = 'expired';
                         statusText = '<i class="iconfont icon-triangle-exclamation"></i> 已过期';
                         statusBadge = 'danger';
-                    } else if (daysLeft <= 20) {  // 修改为固定20天，按需求调整
+                    } else if (daysLeft <= 30) {  // 修改为固定30天，按需求调整
                         statusClass = 'warning';
                         statusText = '<i class="iconfont icon-bullhorn"></i> 即将到期';
                         statusBadge = 'warning';
