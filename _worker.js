@@ -6,8 +6,9 @@ const ICONFONT_CSS = '//at.alicdn.com/t/c/font_4973034_ehjc2dhuu76.css';
 const ICONFONT_JS = '//at.alicdn.com/t/c/font_4973034_ehjc2dhuu76.js';
 
 // 网站图标和背景图片，可在环境变量中设置
-const DEFAULT_LOGO = 'https://imgr2.952536.xyz/Hexo/Decoration/domain-outline.png'; // 默认Logo图片，外置变量名为LOGO_URL
-const DEFAULT_BACKGROUND = 'https://imgr2.952536.xyz/Hexo/Wallpaper/bujidao-street.png'; // 默认背景图片，外置变量名为BACKGROUND_URL
+const DEFAULT_LOGO = 'https://cdn.jsdelivr.net/gh/kamanfaiz/CF-Domain-AutoCheck@main/img/logo.png'; // 默认Logo图片，外置变量名为LOGO_URL
+const DEFAULT_BACKGROUND = 'https://cdn.jsdelivr.net/gh/kamanfaiz/CF-Domain-AutoCheck@main/img/background.png'; // 默认背景图片，外置变量名为BACKGROUND_URL
+const DEFAULT_MOBILE_BACKGROUND = 'https://cdn.jsdelivr.net/gh/kamanfaiz/CF-Domain-AutoCheck@main/img/mobile2.png'; // 默认手机端背景图片，留空则使用桌面端背景图片，外置变量名为MOBILE_BACKGROUND_URL
 
 // 登录密码设置
 const DEFAULT_TOKEN = ''; // 在此处设置默认密码，留空则使用'domain'，外置变量名为TOKEN
@@ -50,6 +51,15 @@ const getLoginHTML = (title) => `
             justify-content: center;
             position: relative;
             overflow: hidden;
+        }
+        
+        /* 登录界面移动端背景图片适配 */
+        @media (max-width: 768px) {
+            body {
+                background-image: url('${typeof MOBILE_BACKGROUND_URL !== 'undefined' && MOBILE_BACKGROUND_URL ? MOBILE_BACKGROUND_URL : (DEFAULT_MOBILE_BACKGROUND ? DEFAULT_MOBILE_BACKGROUND : (typeof BACKGROUND_URL !== 'undefined' ? BACKGROUND_URL : DEFAULT_BACKGROUND))}');
+                background-attachment: scroll;
+                background-position: center;
+            }
         }
         
         body::before {
@@ -279,6 +289,34 @@ const getHTMLContent = (title) => `
             min-height: 100vh;
         }
         
+        /* 移动端背景图片优化 */
+        @media (max-width: 768px) {
+            body {
+                background-attachment: scroll;
+                background-size: cover;
+                background-position: center top;
+                min-height: 100vh;
+                /* 移动端使用专门的背景图片，如果没有则回退到桌面端背景图片 */
+                background-image: url('${typeof MOBILE_BACKGROUND_URL !== 'undefined' && MOBILE_BACKGROUND_URL ? MOBILE_BACKGROUND_URL : (DEFAULT_MOBILE_BACKGROUND ? DEFAULT_MOBILE_BACKGROUND : (typeof BACKGROUND_URL !== 'undefined' ? BACKGROUND_URL : DEFAULT_BACKGROUND))}');
+            }
+            
+            /* 使用伪元素固定背景，避免缩放问题 */
+            body::after {
+                content: '';
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100vh;
+                background-image: url('${typeof MOBILE_BACKGROUND_URL !== 'undefined' && MOBILE_BACKGROUND_URL ? MOBILE_BACKGROUND_URL : (DEFAULT_MOBILE_BACKGROUND ? DEFAULT_MOBILE_BACKGROUND : (typeof BACKGROUND_URL !== 'undefined' ? BACKGROUND_URL : DEFAULT_BACKGROUND))}');
+                background-size: cover;
+                background-position: center;
+                background-repeat: no-repeat;
+                z-index: -2;
+                pointer-events: none;
+            }
+        }
+        
         body::before {
             content: '';
             position: fixed;
@@ -287,7 +325,7 @@ const getHTMLContent = (title) => `
             right: 0;
             bottom: 0;
             background-color: rgba(0, 0, 0, 0.55); /* 这里调整登录后界面背景图的黑色蒙版不透明度 */
-            z-index: 0;
+            z-index: -1;
         }
         
         .navbar {
@@ -4254,6 +4292,9 @@ export default {
       if (env.BACKGROUND_URL) {
         globalThis.BACKGROUND_URL = env.BACKGROUND_URL;
       }
+      if (env.MOBILE_BACKGROUND_URL) {
+        globalThis.MOBILE_BACKGROUND_URL = env.MOBILE_BACKGROUND_URL;
+      }
       if (env.SITE_NAME) {
         globalThis.SITE_NAME = env.SITE_NAME;
       }
@@ -4411,7 +4452,8 @@ function getSetupHTML() {
         <li><code>TOKEN</code> - 登录密码，如果不设置则默认使用"domain"</li>
         <li><code>SITE_NAME</code> - 网站标题</li>
         <li><code>LOGO_URL</code> - 自定义Logo图片URL</li>
-        <li><code>BACKGROUND_URL</code> - 自定义背景图片URL</li>
+        <li><code>BACKGROUND_URL</code> - 自定义桌面端背景图片URL</li>
+        <li><code>MOBILE_BACKGROUND_URL</code> - 自定义移动端背景图片URL（可选，如果不设置则使用桌面端背景图片）</li>
         <li><code>TG_TOKEN</code> - Telegram机器人Token</li>
         <li><code>TG_ID</code> - Telegram聊天ID</li>
       </ul>
