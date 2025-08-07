@@ -35,14 +35,15 @@
 
     > 先级都是：Cloudflare环境变量＞代码中的变量＞默认值🚨
 
-    | 名称           | 示例                                                                     | 必填 | 备注                                     |
-    |:---------------|:-------------------------------------------------------------------------|:----:|:-----------------------------------------|
-    | TOKEN          | 默认是domain                                                             |  ✅️   | 登录密码，最好自定义，不填则默认是domain |
-    | TG_TOKEN       | telegram找[@BotFather](https://t.me/BotFather)获取                       |  ❌️   | 可在界面后端配置                         |
-    | TG_ID          | telegram找[@userinfobot](https://t.me/userinfobot)获取，或者群机器人也行 |  ❌️   | 可在界面后端配置                         |
-    | SITE_NAME      | 默认为域名到期监控                                                       |  ❌️   | 不填，默认就是域名到期监控               |
-    | LOGO_URL       | https://123abc.com/logo.svg                                              |  ❌️   | 网站logo，有需要可自行设置               |
-    | BACKGROUND_URL | https://123abc.com/img.jpg                                               |  ❌️   | 背景图，有需要的可以自己设置             |
+| 名称                  | 示例                                                                     | 必填 | 备注                                     |
+|:----------------------|:-------------------------------------------------------------------------|:----:|:-----------------------------------------|
+| TOKEN                 | 默认是domain                                                             |  ✅️   | 登录密码，最好自定义，不填则默认是domain |
+| TG_TOKEN              | telegram找[@BotFather](https://t.me/BotFather)获取                       |  ❌️   | 可在界面后端配置                         |
+| TG_ID                 | telegram找[@userinfobot](https://t.me/userinfobot)获取，或者群机器人也行 |  ❌️   | 可在界面后端配置                         |
+| SITE_NAME             | 默认为域名到期监控                                                       |  ❌️   | 不填，默认就是域名到期监控               |
+| LOGO_URL              | https://123abc.com/logo.svg                                              |  ❌️   | 网站logo，有需要可自行设置               |
+| BACKGROUND_URL        | https://123abc.com/img.jpg                                               |  ❌️   | 桌面端背景图，有需要的可以自己设置       |
+| MOBILE_BACKGROUND_URL | https://123abc.com/img.jpg                                               |  ❌️   | 手机端背景图，有需要的可以自己设置       |
 
 6. 按照上述变量名添加完telegram变量后，点击`设置`——点击`触发事件`——点击`添加`——选择`cron触发器`——选择`一周中的某一天`——自定义时间
     > 🚨这里面的时间不是北京时间，是UTC时间，与北京时间相差8小时，例如设置为00:00，那么会在北京时间08:00进行通知🚨
