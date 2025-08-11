@@ -1,4 +1,4 @@
-# CF-Domain-Autocheck
+# 🌍CF-Domain-Autocheck
 
 ## 🚨本项目主要是通过和Ai沟通创作而成，有能力的小伙伴可自行进行完善或魔改🚨
 
