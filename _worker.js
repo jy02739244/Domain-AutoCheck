@@ -1645,12 +1645,28 @@ const getHTMLContent = (title) => `
                         </div>
                         <div class="mb-3">
                             <label for="registrationDate" class="form-label"><i class="iconfont icon-calendar-days"></i> 注册时间(必填)</label>
-                            <input type="date" class="form-control" id="registrationDate">
+                            <input type="date" class="form-control" id="registrationDate" required>
                             <div class="form-text">域名首次注册的时间</div>
                         </div>
+                        
+                        <!-- 续期周期设置 -->
+                        <div class="mb-3">
+                            <label for="renewCycle" class="form-label"><i class="iconfont icon-repeat"></i> 续期周期(必填)</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="renewCycleValue" value="1" min="1" max="100">
+                                <select class="form-select" id="renewCycleUnit">
+                                    <option value="year" selected>年</option>
+                                    <option value="month">月</option>
+                                    <option value="day">日</option>
+                                </select>
+                            </div>
+                            <div class="form-text">域名的常规续期周期，用于计算进度条和到期日期</div>
+                        </div>
+                        
                         <div class="mb-3">
                             <label for="expiryDate" class="form-label"><i class="iconfont icon-calendar-days"></i> 到期日期(必填)</label>
                             <input type="date" class="form-control" id="expiryDate" required>
+                            <div class="form-text text-info">根据注册时间和续期周期自动计算，可手动调整</div>
                         </div>
                         
                         <!-- 价格设置 -->
@@ -1672,20 +1688,6 @@ const getHTMLContent = (title) => `
                                 </select>
                             </div>
                             <div class="form-text">域名的价格，支持多国货币</div>
-                        </div>
-                        
-                        <!-- 续期周期设置 -->
-                        <div class="mb-3">
-                            <label for="renewCycle" class="form-label"><i class="iconfont icon-repeat"></i> 续期周期(必填)</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" id="renewCycleValue" value="1" min="1" max="100">
-                                <select class="form-select" id="renewCycleUnit">
-                                    <option value="year" selected>年</option>
-                                    <option value="month">月</option>
-                                    <option value="day">日</option>
-                                </select>
-                            </div>
-                            <div class="form-text">域名的常规续期周期，用于计算进度条</div>
                         </div>
                         
                         <!-- 添加续费链接字段 -->
@@ -1871,17 +1873,13 @@ const getHTMLContent = (title) => `
         
         // 页面加载完成后执行
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOMContentLoaded 事件触发');
-            
             // 设置事件监听器
             setupEventListeners();
             
             // 确保DOM元素已完全加载
             setTimeout(() => {
-                console.log('开始加载数据');
                 // 使用Promise.all并行加载数据
                 Promise.all([loadDomains(), loadTelegramConfig()])
-                    .then(() => console.log('数据加载完成'))
                     .catch(error => console.error('数据加载错误:', error));
             }, 300);
             
@@ -1928,11 +1926,19 @@ const getHTMLContent = (title) => `
                 document.getElementById('lastRenewed').value = '';
                 document.getElementById('lastRenewedDisplay').textContent = '已清除';
                 document.getElementById('lastRenewedDisplay').classList.add('text-danger');
+                
+                // 清除上次续期时间后，重新根据注册时间和续期周期计算到期日期
+                calculateExpiryDate();
             });
             
             // 续期值或单位变化时更新新到期日期
             document.getElementById('renewPeriodValue').addEventListener('input', updateNewExpiryDate);
             document.getElementById('renewPeriodUnit').addEventListener('change', updateNewExpiryDate);
+            
+            // 注册时间和续期周期变化时自动计算到期日期
+            document.getElementById('registrationDate').addEventListener('change', calculateExpiryDate);
+            document.getElementById('renewCycleValue').addEventListener('input', calculateExpiryDate);
+            document.getElementById('renewCycleUnit').addEventListener('change', calculateExpiryDate);
             
             // Telegram启用状态变化
             document.getElementById('telegramEnabled').addEventListener('change', function() {
@@ -1950,37 +1956,39 @@ const getHTMLContent = (title) => `
                 document.getElementById('domainNotifySettings').style.display = this.checked ? 'none' : 'block';
             });
             
-            // 自定义备注颜色预览
-            function updateNotePreview() {
-                const noteText = document.getElementById('customNote').value.trim();
-                const noteColor = document.getElementById('noteColor').value;
-                const notePreview = document.getElementById('notePreview');
+            // 根据注册时间和续期周期自动计算到期日期
+            function calculateExpiryDate() {
+                const registrationDate = document.getElementById('registrationDate').value;
+                const lastRenewed = document.getElementById('lastRenewed').value;
+                const renewCycleValue = parseInt(document.getElementById('renewCycleValue').value) || 1;
+                const renewCycleUnit = document.getElementById('renewCycleUnit').value;
                 
-                if (noteText) {
-                    // 更新预览文字和显示状态
-                    notePreview.textContent = noteText;
-                    notePreview.style.display = 'inline-block';
-                    
-                    // 移除所有颜色类但保留基本样式
-                    notePreview.className = 'text-info note-preview';
-                    // 添加选中的颜色类
-                    notePreview.classList.add(noteColor);
-                    
-                    // 使用内联样式强制设置颜色
-                    const colorMap = {
-                        'tag-blue': '#3B82F6',
-                        'tag-green': '#10B981',
-                        'tag-red': '#EF4444',
-                        'tag-yellow': '#F59E0B',
-                        'tag-purple': '#8B5CF6',
-                        'tag-pink': '#EC4899',
-                        'tag-indigo': '#6366F1',
-                        'tag-gray': '#6B7280'
-                    };
-                    notePreview.style.backgroundColor = colorMap[noteColor] || '#3B82F6';
-                } else {
-                    notePreview.style.display = 'none';
+                if (!registrationDate) {
+                    // 如果没有注册时间，清空到期日期
+                    document.getElementById('expiryDate').value = '';
+                    return;
                 }
+                
+                // 如果有上次续期时间，则从上次续期时间开始计算；否则从注册时间开始计算
+                const baseDate = lastRenewed ? new Date(lastRenewed) : new Date(registrationDate);
+                const expiryDate = new Date(baseDate);
+                
+                // 根据续期周期单位计算到期日期
+                switch(renewCycleUnit) {
+                    case 'year':
+                        expiryDate.setFullYear(baseDate.getFullYear() + renewCycleValue);
+                        break;
+                    case 'month':
+                        expiryDate.setMonth(baseDate.getMonth() + renewCycleValue);
+                        break;
+                    case 'day':
+                        expiryDate.setDate(baseDate.getDate() + renewCycleValue);
+                        break;
+                }
+                
+                // 格式化日期为 YYYY-MM-DD 格式
+                const formattedDate = expiryDate.toISOString().split('T')[0];
+                document.getElementById('expiryDate').value = formattedDate;
             }
             
             // 监听备注文本和颜色变化
@@ -2024,8 +2032,6 @@ const getHTMLContent = (title) => `
                     
                     // 根据模式直接进行操作
                     if (newViewMode === 'expand-all') {
-                        console.log('展开所有卡片，共 ' + allDetails.length + ' 个');
-                        
                         // 直接展开所有卡片
                         allDetails.forEach(detail => {
                             // 手动添加show类，强制显示
@@ -2058,8 +2064,6 @@ const getHTMLContent = (title) => `
                             }
                         });
                     } else if (newViewMode === 'collapse-all' || newViewMode === 'auto-collapse') {
-                        console.log('折叠所有卡片，共 ' + allDetails.length + ' 个');
-                        
                         // 直接折叠所有卡片
                         allDetails.forEach(detail => {
                             // 手动移除show类，强制隐藏
@@ -2176,10 +2180,41 @@ const getHTMLContent = (title) => `
             });
         }
         
+        // 自定义备注颜色预览函数
+        function updateNotePreview() {
+            const noteText = document.getElementById('customNote').value.trim();
+            const noteColor = document.getElementById('noteColor').value;
+            const notePreview = document.getElementById('notePreview');
+            
+            if (noteText) {
+                // 更新预览文字和显示状态
+                notePreview.textContent = noteText;
+                notePreview.style.display = 'inline-block';
+                
+                // 移除所有颜色类但保留基本样式
+                notePreview.className = 'text-info note-preview';
+                // 添加选中的颜色类
+                notePreview.classList.add(noteColor);
+                
+                // 使用内联样式强制设置颜色
+                const colorMap = {
+                    'tag-blue': '#3B82F6',
+                    'tag-green': '#10B981',
+                    'tag-red': '#EF4444',
+                    'tag-yellow': '#F59E0B',
+                    'tag-purple': '#8B5CF6',
+                    'tag-pink': '#EC4899',
+                    'tag-indigo': '#6366F1',
+                    'tag-gray': '#6B7280'
+                };
+                notePreview.style.backgroundColor = colorMap[noteColor] || '#3B82F6';
+            } else {
+                notePreview.style.display = 'none';
+            }
+        }
+        
         // 加载所有域名
         async function loadDomains() {
-            console.log('开始加载域名数据');
-            
             // 先尝试显示加载状态，但不阻止后续操作
             try {
                 showDomainLoadingState();
@@ -2189,7 +2224,6 @@ const getHTMLContent = (title) => `
             }
             
             try {
-                console.log('发送API请求获取域名数据');
                 const response = await fetch('/api/domains');
                 
                 if (!response.ok) {
@@ -2198,15 +2232,11 @@ const getHTMLContent = (title) => `
                     throw new Error('获取域名列表失败: ' + response.status);
                 }
                 
-                console.log('API响应成功，解析数据');
                 domains = await response.json();
-                console.log('获取到域名数据:', domains.length, '条记录');
                 
                 // 确保DOM元素已加载后再渲染
                 setTimeout(() => {
-                    console.log('开始渲染域名列表');
                     renderDomainList();
-                    console.log('域名列表渲染完成');
                 }, 100);
                 
                 return domains; // 返回加载的域名数据
@@ -2219,17 +2249,12 @@ const getHTMLContent = (title) => `
         
         // 显示域名加载中的状态
         function showDomainLoadingState() {
-            console.log('尝试显示加载状态');
-            
             // 使用document.querySelector作为备选方法
             const domainListContainer = document.getElementById('domainListContainer') || document.querySelector('#domainListContainer');
             
             if (!domainListContainer) {
-                console.error('domainListContainer 元素不存在 - 无法显示加载状态');
                 return;
             }
-            
-            console.log('找到domainListContainer元素，设置骨架屏');
             
             try {
                 // 创建骨架屏
@@ -2246,8 +2271,6 @@ const getHTMLContent = (title) => `
                         generateSkeletonCard() +
                         generateSkeletonCard() +
                     '</div>';
-                    
-                console.log('骨架屏设置成功');
             } catch (error) {
                 console.error('设置骨架屏失败:', error);
             }
@@ -2381,7 +2404,6 @@ const getHTMLContent = (title) => `
             // 获取domainListContainer
             const domainListContainer = document.getElementById('domainListContainer');
             if (!domainListContainer) {
-                console.error('renderDomainList: domainListContainer 元素不存在');
                 return;
             }
             
@@ -2883,8 +2905,8 @@ const getHTMLContent = (title) => `
             const notifyEnabled = document.getElementById('notifyEnabled').checked;
             const notifyDays = parseInt(document.getElementById('domainNotifyDays').value) || 30;
             
-            if (!name || !expiryDate) {
-                showAlert('danger', '域名和到期日期为必填项');
+            if (!name || !registrationDate || !expiryDate) {
+                showAlert('danger', '域名、注册时间和到期日期为必填项');
                 return;
             }
             
@@ -2901,13 +2923,7 @@ const getHTMLContent = (title) => `
                 currency: priceCurrency,
                 unit: priceUnit
             } : null;
-            
-            // 调试输出
-            console.log('价格值:', priceValue);
-            console.log('货币单位:', priceCurrency);
-            console.log('价格周期:', priceUnit);
-            console.log('价格对象:', priceObj);
-            console.log('备注颜色:', noteColor);
+
             
             const domainData = {
                 name,
@@ -2946,9 +2962,6 @@ const getHTMLContent = (title) => `
                         }
                         
                         if (!response.ok) throw new Error('保存域名失败');
-                        
-                        // 输出调试信息
-                        console.log('发送的数据:', domainData);
                         
                         // 关闭模态框并重新加载域名列表
                         bootstrap.Modal.getInstance(document.getElementById('addDomainModal')).hide();
@@ -3024,6 +3037,16 @@ const getHTMLContent = (title) => `
                     document.querySelector('#addDomainModal .modal-title').textContent = '编辑域名';
                     const modal = new bootstrap.Modal(document.getElementById('addDomainModal'));
                     modal.show();
+                    
+                    // 在编辑模式下的设置
+                    setTimeout(() => {
+                        // 等待模态框完全显示后执行
+                        document.getElementById('expiryDate').removeAttribute('readonly');
+                        document.querySelector('label[for="expiryDate"]').innerHTML = '<i class="iconfont icon-calendar-days"></i> 到期日期(必填)';
+                        document.querySelector('label[for="expiryDate"]').nextElementSibling.nextElementSibling.textContent = '根据注册时间和续期周期自动计算，可手动调整';
+                        document.querySelector('label[for="expiryDate"]').nextElementSibling.nextElementSibling.className = 'form-text text-info';
+                        updateNotePreview(); // 更新备注预览
+                    }, 100);
                 }
                 
                 // 显示删除确认模态框
@@ -3167,6 +3190,12 @@ const getHTMLContent = (title) => `
                     document.getElementById('notifyEnabled').checked = true;
                     document.getElementById('domainNotifyDays').value = '30';
                     document.getElementById('domainNotifySettings').style.display = 'none';
+                    
+                    // 重置到期日期字段状态（添加新域名时保持可编辑）
+                    document.getElementById('expiryDate').removeAttribute('readonly');
+                    document.querySelector('label[for="expiryDate"]').innerHTML = '<i class="iconfont icon-calendar-days"></i> 到期日期(必填)';
+                    document.querySelector('label[for="expiryDate"]').nextElementSibling.nextElementSibling.textContent = '根据注册时间和续期周期自动计算，可手动调整';
+                    document.querySelector('label[for="expiryDate"]').nextElementSibling.nextElementSibling.className = 'form-text text-info';
                     
                     document.querySelector('#addDomainModal .modal-title').textContent = '添加新域名';
                 }
@@ -3505,9 +3534,7 @@ async function handleApiRequest(request) {
   if (path === '/api/telegram/config' && request.method === 'POST') {
     try {
       const configData = await request.json();
-      console.log('保存Telegram配置:', JSON.stringify(configData));
       const config = await saveTelegramConfig(configData);
-      console.log('保存成功，返回配置:', JSON.stringify(config));
       return jsonResponse(config);
     } catch (error) {
       console.error('保存Telegram配置失败:', error);
@@ -3551,8 +3578,8 @@ async function addDomain(domainData) {
   const domains = await getDomains();
   
   // 验证域名数据
-  if (!domainData.name || !domainData.expiryDate) {
-    throw new Error('域名和到期日期为必填项');
+  if (!domainData.name || !domainData.registrationDate || !domainData.expiryDate) {
+    throw new Error('域名、注册时间和到期日期为必填项');
   }
   
   // 生成唯一ID
@@ -3596,8 +3623,8 @@ async function updateDomain(id, domainData) {
   }
   
   // 验证域名数据
-  if (!domainData.name || !domainData.expiryDate) {
-    throw new Error('域名和到期日期为必填项');
+  if (!domainData.name || !domainData.registrationDate || !domainData.expiryDate) {
+    throw new Error('域名、注册时间和到期日期为必填项');
   }
   
   // 确保通知设置正确
@@ -3992,7 +4019,6 @@ async function checkExpiringDomains() {
   
   // 如果有即将到期或已过期的域名，发送通知
   if (expiringDomains.length > 0 || expiredDomains.length > 0) {
-    console.log('有 ' + expiringDomains.length + ' 个域名即将到期，' + expiredDomains.length + ' 个域名已过期');
     
     // 如果启用了Telegram通知，则发送通知
     if (telegramConfig.enabled && 
@@ -4124,39 +4150,13 @@ async function testSingleDomainNotification(id) {
   return { success: true, message: '测试通知已发送' };
 }
 
-// 格式化日期
+// 格式化日期函数
 function formatDate(dateString) {
   const date = new Date(dateString);
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return year + '-' + month + '-' + day;
-}
-
-// 将天数转换为年月日格式
-function formatDaysToYMD(days) {
-  if (days <= 0) return '';
-  
-  const years = Math.floor(days / 365);
-  const remainingDaysAfterYears = days % 365;
-  const months = Math.floor(remainingDaysAfterYears / 30);
-  const remainingDays = remainingDaysAfterYears % 30;
-  
-  let result = '';
-  
-  if (years > 0) {
-    result += years + '年';
-  }
-  
-  if (months > 0) {
-    result += months + '个月';
-  }
-  
-  if (remainingDays > 0) {
-    result += remainingDays + '天';
-  }
-  
-  return result;
 }
 
 // 注册Cloudflare Workers事件处理程序
