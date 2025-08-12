@@ -1,8 +1,7 @@
 # 🌍CF-Domain-Autocheck
 
-## 修复日志
 <details>
-    <summary>其他页面效果展示</summary>
+    <summary>修复日志</summary>
     2025-08-13 修复到期日期会根据用户输入的注册时间和续期周期自动计算
     2025-08-06 修复手机端背景图会依页面内容自动放大或缩小；新增可自定义手机端背景图
 </details>
