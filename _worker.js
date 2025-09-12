@@ -92,7 +92,6 @@ async function queryDomainWhois(domain) {
       raw: data // 保留原始数据以备后用
     };
   } catch (error) {
-    console.error('WhoisJSON查询失败:', error);
     return {
       success: false,
       error: error.message,
@@ -2988,7 +2987,6 @@ const getHTMLContent = (title) => `
                     categories = categoryList;
                 }
             } catch (error) {
-                console.error('获取分类失败:', error);
                 // 如果获取分类失败，创建默认分类
                 categoryList = [{
                     id: 'default',
@@ -3605,7 +3603,7 @@ const getHTMLContent = (title) => `
                                 categories = currentCategories; // 同步到全局变量
                             }
                         } catch (error) {
-                            console.error('加载分类失败:', error);
+                            // 加载分类失败时静默处理
                         }
                     }
                     
@@ -3890,7 +3888,7 @@ const getHTMLContent = (title) => `
                             }
                         }
                     } catch (error) {
-                        console.error('加载分类失败:', error);
+                        // 加载分类失败时静默处理
                     }
                 }
                 
@@ -4275,7 +4273,6 @@ const getHTMLContent = (title) => `
                         if (error.name === 'AbortError') {
                             showWhoisStatus('查询已取消', 'info');
                         } else {
-                            console.error('WHOIS查询错误:', error);
                             showWhoisStatus('查询失败: ' + error.message, 'danger');
                         }
                     } finally {
@@ -4414,7 +4411,6 @@ const getHTMLContent = (title) => `
                             }
                         }
                     } catch (error) {
-                        console.error('计算续期周期失败:', error);
                         // 出错时使用默认值
                         document.getElementById('renewCycleValue').value = '1';
                         document.getElementById('renewCycleUnit').value = 'year';
@@ -4543,6 +4539,11 @@ const getHTMLContent = (title) => `
 async function handleRequest(request) {
   const url = new URL(request.url);
   const path = url.pathname;
+  
+  // 配置检测API（在KV检查之前处理）
+  if (path === '/api/check-setup' && request.method === 'GET') {
+    return await checkSetupStatus();
+  }
   
   // 检查是否已配置KV空间
   if (!isKVConfigured()) {
@@ -4878,6 +4879,90 @@ async function handleApiRequest(request) {
   
   // 404 - 路由不存在
   return jsonResponse({ error: '未找到请求的资源' }, 404);
+}
+
+// ================================
+// 配置检测函数区域
+// ================================
+
+// 检查KV绑定状态
+async function checkKVBinding() {
+  try {
+    if (typeof DOMAIN_MONITOR === 'undefined' || !DOMAIN_MONITOR) {
+      return {
+        isValid: false,
+        error: 'DOMAIN_MONITOR KV namespace is not bound',
+        message: 'KV存储空间未绑定'
+      };
+    }
+    
+    // 尝试访问KV存储
+    await DOMAIN_MONITOR.get('test');
+    return {
+      isValid: true,
+      message: 'KV存储空间已正确绑定'
+    };
+  } catch (error) {
+    return {
+      isValid: false,
+      error: error.message,
+      message: 'KV存储空间访问失败'
+    };
+  }
+}
+
+// 检查完整的配置状态
+async function checkSetupStatus() {
+  try {
+    const kvStatus = await checkKVBinding();
+    
+    if (!kvStatus.isValid) {
+      return new Response(JSON.stringify({
+        success: false,
+        message: kvStatus.message,
+        details: kvStatus.error,
+        nextStep: 'bindKV'
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // 获取正确的密码配置
+    let correctPassword = 'domain';
+    if (typeof TOKEN !== 'undefined' && TOKEN) {
+      correctPassword = TOKEN;
+    } else if (DEFAULT_TOKEN) {
+      correctPassword = DEFAULT_TOKEN;
+    }
+    
+    // 检查是否需要认证（域名监控系统默认需要认证）
+    const authRequired = true;
+    
+    const result = {
+      success: true,
+      message: '配置检查完成',
+      kvBound: true,
+      authRequired: authRequired,
+      hasAuth: authRequired && !!correctPassword,
+      nextStep: authRequired ? 'login' : 'dashboard'
+    };
+    
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({
+      success: false,
+      message: '配置检查失败',
+      details: error.message,
+      nextStep: 'retry'
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
 }
 
 // ================================
@@ -5877,194 +5962,388 @@ async function addFooterToResponse(response) {
   return response;
 }
 
-// 添加Pages兼容性支持
-export default {
-  async fetch(request, env, ctx) {
-    // 在Pages环境中，env包含绑定的变量
-    if (env) {
-      // 将环境变量绑定到全局，以便与Workers代码兼容
-      if (env.DOMAIN_MONITOR) {
-        globalThis.DOMAIN_MONITOR = env.DOMAIN_MONITOR;
-      }
-      if (env.TOKEN) {
-        globalThis.TOKEN = env.TOKEN;
-      }
-      if (env.LOGO_URL) {
-        globalThis.LOGO_URL = env.LOGO_URL;
-      }
-      if (env.BACKGROUND_URL) {
-        globalThis.BACKGROUND_URL = env.BACKGROUND_URL;
-      }
-      if (env.MOBILE_BACKGROUND_URL) {
-        globalThis.MOBILE_BACKGROUND_URL = env.MOBILE_BACKGROUND_URL;
-      }
-      if (env.WHOISJSON_API_KEY) {
-        globalThis.WHOISJSON_API_KEY = env.WHOISJSON_API_KEY;
-      }
-      if (env.SITE_NAME) {
-        globalThis.SITE_NAME = env.SITE_NAME;
-      }
-      if (env.TG_TOKEN) {
-        globalThis.TG_TOKEN = env.TG_TOKEN;
-      }
-      if (env.TG_ID) {
-        globalThis.TG_ID = env.TG_ID;
-      }
-    }
-    
-    // 使用相同的请求处理函数
-    return handleRequest(request);
-  },
-  
-  async scheduled(event, env, ctx) {
-    // 在Pages环境中，env包含绑定的变量
-    if (env) {
-      // 将环境变量绑定到全局，以便与Workers代码兼容
-      if (env.DOMAIN_MONITOR) {
-        globalThis.DOMAIN_MONITOR = env.DOMAIN_MONITOR;
-      }
-      if (env.TG_TOKEN) {
-        globalThis.TG_TOKEN = env.TG_TOKEN;
-      }
-      if (env.TG_ID) {
-        globalThis.TG_ID = env.TG_ID;
-      }
-    }
-    
-    // 使用相同的定时任务处理函数
-    return checkExpiringDomains();
-  }
-};
 
 // 获取配置向导HTML
 function getSetupHTML() {
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>域名监控系统 - 配置向导</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    body {
-      font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
-      background-color: #f8f9fa;
-      padding: 20px;
-    }
-    .setup-container {
-      max-width: 800px;
-      margin: 0 auto;
-      background-color: white;
-      border-radius: 10px;
-      padding: 20px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    .step {
-      margin-bottom: 20px;
-      padding: 15px;
-      border-left: 4px solid #4e54c8;
-      background-color: #f8f9fa;
-    }
-    .step-number {
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>域名监控系统 - 初始化配置</title>
+    <link rel="icon" type="image/svg+xml" href="${DEFAULT_LOGO}">
+    <link rel="stylesheet" href="${ICONFONT_CSS}">
+    <script src="${ICONFONT_JS}"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .setup-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            padding: 40px;
+            max-width: 800px;
+            width: 90%;
+            margin: 20px;
+        }
+        
+        .setup-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .setup-header .iconfont {
+            font-size: 64px;
+            color: #272830;
+            margin-bottom: 16px;
+            display: block;
+        }
+        
+        .setup-header h1 {
+            color: #2c3e50;
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        
+        .setup-header p {
+            color: #7f8c8d;
+            font-size: 16px;
+        }
+        
+        .step {
+            margin-bottom: 30px;
+            padding: 24px;
+            border: 1px solid #e1e8ed;
+            border-radius: 12px;
+            background: #f8fafc;
+        }
+        
+        .step-title {
+            display: flex;
+            align-items: center;
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 16px;
+        }
+        
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+            margin-right: 12px;
+        }
+        
+        .step-content {
+            color: #555;
+            line-height: 1.7;
+        }
+        
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            margin: 12px 0;
+            overflow-x: auto;
+        }
+        
+        .config-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+        }
+        
+        .config-table th,
+        .config-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e1e8ed;
+        }
+        
+        .config-table th {
+            background: #f1f3f4;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .config-table code {
+            background: #f1f3f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+        }
+        
+        .check-button {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 16px 24px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 30px;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+        
+        .check-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+            color: white;
+            text-decoration: none;
+        }
+        
+        .check-button:active {
+            transform: translateY(0);
+        }
+        
+        .check-button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .status-message {
+            margin-top: 20px;
+            padding: 16px;
+            border-radius: 8px;
+            font-weight: 500;
+            display: none;
+        }
+        
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status-loading {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .loading-spinner {
       display: inline-block;
-      width: 30px;
-      height: 30px;
-      background-color: #4e54c8;
-      color: white;
-      text-align: center;
-      line-height: 30px;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ffffff;
       border-radius: 50%;
-      margin-right: 10px;
-    }
-    code {
-      background-color: #f1f1f1;
-      padding: 2px 5px;
-      border-radius: 3px;
-    }
-    img {
-      max-width: 100%;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      margin: 10px 0;
-    }
-    .alert {
-      margin-top: 20px;
-    }
-    .btn-primary {
-      background-color: #4e54c8;
-      border-color: #4e54c8;
-    }
-    .btn-primary:hover {
-      background-color: #3f44ae;
-      border-color: #3f44ae;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .iconfont {
+            font-size: 20px;
+            margin-right: 8px;
+        }
+        
+        @media (max-width: 768px) {
+            .setup-container {
+                padding: 24px;
+                margin: 10px;
+            }
+            
+            .setup-header h1 {
+                font-size: 24px;
+            }
+            
+            .code-block {
+                font-size: 12px;
+                padding: 12px;
+            }
     }
   </style>
 </head>
 <body>
   <div class="setup-container">
-    <h1 class="mb-4">域名监控系统 - 配置向导</h1>
-    
-    <div class="alert alert-warning">
-      <strong>提示：</strong> 检测到您尚未完成必要的配置。请按照以下步骤设置您的域名监控系统。
+        <div class="setup-header">
+            <i class="iconfont icon-jiankong-zichanjiankong"></i>
+            <h1>欢迎使用域名到期监控系统</h1>
+            <p>首次使用需要进行简单配置，请按照以下步骤完成初始化</p>
     </div>
     
     <div class="step">
-      <h3><span class="step-number">1</span> 创建KV命名空间</h3>
-      <p>首先，您需要创建一个KV命名空间来存储域名数据：</p>
-      <ol>
-        <li>登录到 <a href="https://dash.cloudflare.com/" target="_blank">Cloudflare仪表板</a></li>
-        <li>选择您的账户，然后点击<strong>Workers & Pages</strong></li>
-        <li>在左侧菜单中，点击<strong>KV</strong></li>
-        <li>点击<strong>创建命名空间</strong>按钮</li>
-        <li>输入命名空间名称，例如：<code>domain-monitor</code></li>
-        <li>点击<strong>添加</strong>按钮完成创建</li>
+            <div class="step-title">
+                <span class="step-number">1</span>
+                <i class="iconfont icon-database"></i>
+                绑定 KV 存储空间 (必需)
+            </div>
+            <div class="step-content">
+                <p>在 Cloudflare Workers 控制台中为您的 Worker 绑定 KV 存储空间：</p>
+                <ol style="margin: 12px 0 12px 20px;">
+                    <li>进入 Cloudflare 控制台 → Workers & Pages</li>
+                    <li>找到您的 Worker 项目，点击进入</li>
+                    <li>转到 "设置" → "变量"</li>
+                    <li>在 "KV 命名空间绑定" 部分点击 "添加绑定"</li>
+                    <li>变量名称填写：<code>DOMAIN_MONITOR</code></li>
+                    <li>选择或创建一个 KV 命名空间</li>
+                    <li>点击 "保存并部署"</li>
       </ol>
+            </div>
     </div>
     
     <div class="step">
-      <h3><span class="step-number">2</span> 绑定KV命名空间到您的项目</h3>
-      <p>接下来，您需要将创建的KV命名空间绑定到您的Workers或Pages项目：</p>
-      
-      <h4>对于Workers项目：</h4>
-      <ol>
-        <li>在Workers & Pages页面，点击您的Workers项目</li>
-        <li>点击<strong>设置</strong>标签，然后选择<strong>变量</strong></li>
-        <li>在<strong>KV命名空间绑定</strong>部分，点击<strong>添加绑定</strong></li>
-        <li>变量名设置为：<code>DOMAIN_MONITOR</code>（必须使用此名称）</li>
-        <li>KV命名空间选择您刚才创建的命名空间</li>
-        <li>点击<strong>保存</strong>按钮</li>
-      </ol>
-      
-      <h4>对于Pages项目：</h4>
-      <ol>
-        <li>在Workers & Pages页面，点击您的Pages项目</li>
-        <li>点击<strong>设置</strong>标签，然后选择<strong>函数</strong></li>
-        <li>在<strong>KV命名空间绑定</strong>部分，点击<strong>添加绑定</strong></li>
-        <li>变量名设置为：<code>DOMAIN_MONITOR</code>（必须使用此名称）</li>
-        <li>KV命名空间选择您刚才创建的命名空间</li>
-        <li>点击<strong>保存</strong>按钮</li>
-      </ol>
+            <div class="step-title">
+                <span class="step-number">2</span>
+                <i class="iconfont icon-setting"></i>
+                配置环境变量 (可选)
+            </div>
+            <div class="step-content">
+                <p>根据需要在 "设置" → "变量" → "环境变量" 中添加以下配置：</p>
+                <table class="config-table">
+                    <thead>
+                        <tr>
+                            <th>变量名</th>
+                            <th>说明</th>
+                            <th>示例</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>TOKEN</code></td>
+                            <td>登录密码（留空则使用默认密码 "domain"）</td>
+                            <td>your_password</td>
+                        </tr>
+                        <tr>
+                            <td><code>SITE_NAME</code></td>
+                            <td>网站标题</td>
+                            <td>我的域名监控</td>
+                        </tr>
+                        <tr>
+                            <td><code>LOGO_URL</code></td>
+                            <td>自定义 Logo 图片 URL</td>
+                            <td>https://example.com/logo.png</td>
+                        </tr>
+                        <tr>
+                            <td><code>BACKGROUND_URL</code></td>
+                            <td>自定义背景图片 URL</td>
+                            <td>https://example.com/bg.jpg</td>
+                        </tr>
+                        <tr>
+                            <td><code>TG_TOKEN</code></td>
+                            <td>Telegram Bot Token（用于到期通知）</td>
+                            <td>1234567890:ABC...</td>
+                        </tr>
+                        <tr>
+                            <td><code>TG_ID</code></td>
+                            <td>Telegram Chat ID</td>
+                            <td>123456789</td>
+                        </tr>
+                        <tr>
+                            <td><code>WHOISJSON_API_KEY</code></td>
+                            <td>WhoisJSON API 密钥（用于域名查询）</td>
+                            <td>your_api_key</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p><strong>注意：</strong>环境变量配置后需要重新部署 Worker 才能生效。</p>
+            </div>
+        </div>
+        
+        <button class="check-button" onclick="checkConfiguration()">
+            <i class="iconfont icon-check"></i>
+            检测配置并进入系统
+        </button>
+        
+        <div id="statusMessage" class="status-message"></div>
     </div>
     
-    <div class="step">
-      <h3><span class="step-number">3</span> 设置环境变量（可选）</h3>
-      <p>您可以设置以下环境变量来自定义您的域名监控系统：</p>
-      <ul>
-        <li><code>TOKEN</code> - 登录密码，如果不设置则默认使用"domain"</li>
-        <li><code>SITE_NAME</code> - 网站标题</li>
-        <li><code>LOGO_URL</code> - 自定义Logo图片URL</li>
-        <li><code>BACKGROUND_URL</code> - 自定义桌面端背景图片URL</li>
-        <li><code>MOBILE_BACKGROUND_URL</code> - 自定义移动端背景图片URL（可选，如果不设置则使用桌面端背景图片）</li>
-        <li><code>TG_TOKEN</code> - Telegram机器人Token</li>
-        <li><code>TG_ID</code> - Telegram聊天ID</li>
-      </ul>
-      <p>在Workers或Pages的<strong>设置 > 变量</strong>部分添加这些环境变量。</p>
-    </div>
-    
-    <div class="text-center mt-4">
-      <a href="/setup-complete" class="btn btn-primary btn-lg">我已完成设置，刷新页面</a>
-    </div>
-  </div>
+    <script>
+        async function checkConfiguration() {
+            const button = document.querySelector('.check-button');
+            const statusDiv = document.getElementById('statusMessage');
+            
+            // 设置加载状态
+            button.disabled = true;
+            button.innerHTML = '<span class="loading-spinner"></span>检测配置中...';
+            
+            statusDiv.className = 'status-message status-loading';
+            statusDiv.style.display = 'block';
+            statusDiv.textContent = '正在检测配置状态...';
+            
+            try {
+                const response = await fetch('/api/check-setup');
+                const result = await response.json();
+                
+                if (result.success) {
+                    statusDiv.className = 'status-message status-success';
+                    statusDiv.innerHTML = '<i class="iconfont icon-check"></i>' + result.message + '，即将跳转...';
+                    
+                    // 根据配置状态决定跳转目标
+                    setTimeout(() => {
+                        if (result.nextStep === 'dashboard') {
+                            window.location.href = '/dashboard';
+                        } else if (result.nextStep === 'login') {
+                            window.location.href = '/';
+                        } else {
+                            window.location.href = '/';
+                        }
+                    }, 1500);
+                } else {
+                    statusDiv.className = 'status-message status-error';
+                    let errorMessage = '<i class="iconfont icon-close"></i>' + result.message;
+                    if (result.details) {
+                        errorMessage += '<br><small>详细信息: ' + result.details + '</small>';
+                    }
+                    statusDiv.innerHTML = errorMessage;
+                    
+                    // 重置按钮
+                    button.disabled = false;
+                    button.innerHTML = '<i class="iconfont icon-refresh"></i>重新检测';
+                }
+            } catch (error) {
+                statusDiv.className = 'status-message status-error';
+                statusDiv.innerHTML = '<i class="iconfont icon-close"></i>检测失败: ' + error.message;
+                
+                // 重置按钮
+                button.disabled = false;
+                button.innerHTML = '<i class="iconfont icon-refresh"></i>重新检测';
+            }
+        }
+    </script>
 </body>
 </html>`;
 }
