@@ -66,7 +66,7 @@
     | SITE_NAME         | 默认为域名到期监控                                                             |  ❌️   | 不填，默认就是域名到期监控               |
     | LOGO_URL          | https://123abc.com/logo.svg                                                    |  ❌️   | 网站logo，有需要可自行设置               |
     | BACKGROUND_URL    | https://123abc.com/img.jpg                                                     |  ❌️   | 背景图，有需要的可以自己设置             |
-    | WHOISJSON_API_KEY | 去[WHOISJSON](https://whoisjson.com/)平台免费注册获取API，每个月免费1000次查询 |  ❌️   | 仅支持一级域名的自动查询，部署2.0的可以获取 |
+    | WHOISJSON_API_KEY | 去[WHOISJSON](https://whoisjson.com/)平台免费注册获取API，每个月免费1000次查询 |  ❌️   | 仅支持一级域名的自动查询 |
 
 6. 按照上述变量名添加完telegram变量后，点击`设置`——点击`触发事件`——点击`添加`——选择`cron触发器`——选择`一周中的某一天`——自定义时间
     > 🚨这里面的时间不是北京时间，是UTC时间，与北京时间相差8小时，例如设置为00:00，那么会在北京时间08:00进行通知🚨
