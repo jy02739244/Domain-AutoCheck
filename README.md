@@ -20,7 +20,7 @@
 ## 💻界面展示
 |                                 暗色主题                                  |                             亮色主题                             |
 |:-------------------------------------------------------------------------:|:----------------------------------------------------------------:|
-| ![](https://github.com/user-attachments/assets/32beae43-5c95-4608-99b6-c86fae950bc8) | ![](https://github.com/user-attachments/assets/7a7f08d0-4ecd-411f-8929-864f6ea3cef0) |
+| ![](https://github.com/user-attachments/assets/1f683ac4-6380-4201-b3a9-f4de9d5ed4b9) | ![](https://github.com/user-attachments/assets/f6436078-8a0e-4a93-95e7-4d62e0865838) |
 
 ## 📌显示逻辑
 ### 一、卡头标签显示逻辑
