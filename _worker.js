@@ -13,9 +13,9 @@ const ICONFONT_CSS = '//at.alicdn.com/t/c/font_4973034_1qunj5fctpb.css';
 const ICONFONT_JS = '//at.alicdn.com/t/c/font_4973034_1qunj5fctpb.js';
 
 // 网站图标和背景图片
-const DEFAULT_LOGO = 'https://cdn.jsdelivr.net/gh/kamanfaiz/CF-Domain-AutoCheck@main/img/logo.png'; // 默认logo，外置变量为LOGO_URL
-const DEFAULT_BACKGROUND = 'https://cdn.jsdelivr.net/gh/kamanfaiz/CF-Domain-AutoCheck@main/img/background.png'; // 默认背景，外置变量为BACKGROUND_URL
-const DEFAULT_MOBILE_BACKGROUND = 'https://cdn.jsdelivr.net/gh/kamanfaiz/CF-Domain-AutoCheck@main/img/mobile2.png'; // 默认移动端背景，外置变量为MOBILE_BACKGROUND_URL
+const DEFAULT_LOGO = 'https://cdn.jsdelivr.net/gh/jy02739244/CF-Domain-AutoCheck@main/img/logo.png'; // 默认logo，外置变量为LOGO_URL
+const DEFAULT_BACKGROUND = 'https://cdn.jsdelivr.net/gh/jy02739244/CF-Domain-AutoCheck@main/img/background.png'; // 默认背景，外置变量为BACKGROUND_URL
+const DEFAULT_MOBILE_BACKGROUND = 'https://cdn.jsdelivr.net/gh/jy02739244/CF-Domain-AutoCheck@main/img/mobile2.png'; // 默认移动端背景，外置变量为MOBILE_BACKGROUND_URL
 
 // 登录密码设置
 const DEFAULT_TOKEN = ''; // 默认密码，留空则使用'domain'，外置变量为TOKEN
@@ -100,6 +100,147 @@ async function queryDomainWhois(domain) {
   }
 }
 
+// PP.UA 域名查询函数 (使用 nic.ua 接口)
+async function queryPpUaWhois(domain) {
+  try {
+    const response = await fetch(`https://nic.ua/en/whois-info?domain_name=${encodeURIComponent(domain)}`, {
+      method: 'GET',
+      headers: {
+        'accept': '*/*',
+        'accept-language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+        'x-requested-with': 'XMLHttpRequest'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`NIC.UA API请求失败: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    if (data.is_error) {
+       throw new Error('NIC.UA API返回错误');
+    }
+
+    const whoisText = data.whois_info || '';
+    
+    // 解析 WHOIS 文本
+    const parseField = (regex) => {
+      const match = whoisText.match(regex);
+      return match ? match[1].trim() : null;
+    };
+
+    const createdOn = parseField(/Created On:\s*(.+)/i);
+    const expiresOn = parseField(/Expiration Date:\s*(.+)/i);
+    const updatedOn = parseField(/Last Updated On:\s*(.+)/i);
+    const registrar = parseField(/Sponsoring Registrar:\s*(.+)/i);
+    
+    // 提取 Nameservers
+    const nameservers = [];
+    const nsRegex = /Name Server:\s*(.+)/gi;
+    let match;
+    while ((match = nsRegex.exec(whoisText)) !== null) {
+      nameservers.push(match[1].trim());
+    }
+
+    return {
+      success: true,
+      domain: domain,
+      registered: !!createdOn,
+      registrationDate: createdOn ? formatDate(createdOn) : null,
+      expiryDate: expiresOn ? formatDate(expiresOn) : null,
+      lastUpdated: updatedOn ? formatDate(updatedOn) : null,
+      registrar: registrar,
+      registrarUrl: 'https://nic.ua',
+      nameservers: nameservers,
+      status: parseField(/Status:\s*(.+)/i) ? [parseField(/Status:\s*(.+)/i)] : [],
+      dnssec: null,
+      raw: data
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+      domain: domain
+    };
+  }
+}
+
+// DigitalPlat 域名查询函数 (用于 qzz.io, dpdns.org, us.kg, xx.kg)
+async function queryDigitalPlatWhois(domain) {
+  try {
+    // 使用 corsproxy.io 代理请求，解决 Cloudflare Workers 直接访问可能出现的 TLS/SSL 握手错误
+    const targetUrl = `https://dash.domain.digitalplat.org/whois?name=${encodeURIComponent(domain)}`;
+    const response = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`, {
+      method: 'GET',
+      headers: {
+        'accept': 'text/html',
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`DigitalPlat API请求失败: ${response.status} ${response.statusText}`);
+    }
+
+    const whoisText = await response.text();
+    
+    // 检查是否未找到域名
+    if (whoisText.includes('Domain not found')) {
+        return {
+            success: true,
+            domain: domain,
+            registered: false,
+            raw: whoisText
+        };
+    }
+    
+    // 解析 WHOIS 文本
+    const parseField = (regex) => {
+      const match = whoisText.match(regex);
+      return match ? match[1].trim() : null;
+    };
+
+    // 适配不同的日期格式
+    const createdOn = parseField(/Creation Date:\s*(.+)/i);
+    const expiresOn = parseField(/Registry Expiry Date:\s*(.+)/i);
+    const registrar = parseField(/Registrar:\s*(.+)/i);
+    const registrarUrl = parseField(/Registrar URL:\s*(.+)/i);
+
+    // 提取 Nameservers
+    const nameservers = [];
+    const nsRegex = /Name Server:\s*(.+)/gi;
+    let match;
+    while ((match = nsRegex.exec(whoisText)) !== null) {
+      nameservers.push(match[1].trim());
+    }
+
+    return {
+      success: true,
+      domain: domain,
+      registered: !!createdOn,
+      registrationDate: createdOn ? formatDate(createdOn) : null,
+      expiryDate: expiresOn ? formatDate(expiresOn) : null,
+      lastUpdated: null, // 该接口似乎不总是返回更新时间
+      registrar: registrar || 'DigitalPlat',
+      registrarUrl: registrarUrl,
+      nameservers: nameservers,
+      status: parseField(/Domain Status:\s*(.+)/i) ? [parseField(/Domain Status:\s*(.+)/i)] : [],
+      dnssec: null,
+      raw: whoisText // 保存原始文本
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      success: false,
+      error: error.message,
+      domain: domain
+    };
+  }
+}
+
+
 // 检查KV是否已配置
 function isKVConfigured() {
   return typeof DOMAIN_MONITOR !== 'undefined';
@@ -126,6 +267,15 @@ const getLoginHTML = (title) => `
     <!-- 确保图标正确加载 -->
     <script src="${ICONFONT_JS}"></script>
     <style>
+        :root {
+            --primary-color: #6366f1;
+            --primary-hover: #4f46e5;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-glass: rgba(255, 255, 255, 0.6);
+        }
+
         body {
             margin: 0;
             padding: 0;
@@ -158,7 +308,8 @@ const getLoginHTML = (title) => `
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: rgba(0, 0, 0, 0.4); /* 这里调整登录界面背景图的黑色蒙版不透明度 */
+            background-color: rgba(255, 255, 255, 0.2); /* 亮色蒙版 */
+            backdrop-filter: blur(2px);
             z-index: 1;
         }
         
@@ -170,115 +321,111 @@ const getLoginHTML = (title) => `
             height: 0;
             border-style: solid;
             border-width: 0 100px 100px 0;
-            border-color: transparent rgba(53, 83, 248, 0.9) transparent transparent;
+            border-color: transparent var(--primary-color) transparent transparent;
             color: white;
             text-decoration: none;
             z-index: 1000;
             transition: all 0.3s ease;
-            overflow: visible; /* 确保图标不会被裁剪 */
+            overflow: visible;
         }
         .github-corner:hover {
-            border-color: transparent rgba(99, 122, 250, 0.8) transparent transparent;
+            border-color: transparent var(--primary-hover) transparent transparent;
         }
         .github-corner i {
             position: absolute;
             top: 18px;
             right: -82.5px;
             font-size: 40px;
-            transform: rotate(45deg); /* 顺时针旋转45度 */
+            transform: rotate(45deg);
             line-height: 1;
-            display: inline-block; /* 确保图标有确定的尺寸 */
-            width: 40px; /* 设置宽度与字体大小相同 */
-            height: 40px; /* 设置高度与字体大小相同 */
-            text-align: center; /* 文本居中 */
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            text-align: center;
         }
         .login-container {
-            background-color: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            border-radius: 16px;
-            padding: 35px;
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 40px;
             width: 90%;
-            max-width: 400px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            max-width: 420px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-glass);
             position: relative;
             z-index: 10;
         }
         .login-title {
             text-align: center;
-            color: #ffffff;
-            margin-bottom: 25px;
-            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 30px;
+            font-weight: 700;
             display: flex;
             align-items: center;
-            justify-content: center; /* 保持居中 */
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-            margin-left: 0; /* 保留无左边距 */
+            justify-content: center;
+            margin-left: 0;
             margin-right: auto;
             width: 100%;
-            padding-left: 0; /* 完全移除左内边距 */
-            margin-right: 8px; /* 添加右边距以平衡 */
+            padding-left: 0;
+            letter-spacing: 0.5px;
         }
         .login-logo {
-            height: 64px;
-            width: 64px;
-            margin-right: 0px; /* 控制logo和标题文字之间的间距 */
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+            height: 56px;
+            width: 56px;
+            margin-right: 12px;
             vertical-align: middle;
         }
         .form-control {
-            background-color: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            padding: 14px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border: 1px solid #e2e8f0;
+            padding: 14px 16px;
             height: auto;
-            color: #fff;
+            color: var(--text-main);
             font-size: 1.05rem;
-            border-radius: 10px;
-            backdrop-filter: blur(5px);
-            -webkit-backdrop-filter: blur(5px);
+            border-radius: 12px;
             transition: all 0.3s ease;
         }
         .form-control::placeholder {
-            color: rgba(255, 255, 255, 0.8);
+            color: #94a3b8;
         }
         .form-control:focus {
-            background-color: rgba(255, 255, 255, 0.25);
-            border-color: rgba(255, 255, 255, 0.5);
-            box-shadow: 0 0 0 0.25rem rgba(255, 255, 255, 0.2);
-            color: #fff;
+            background-color: #fff;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+            color: var(--text-main);
         }
         .btn-login {
-            background-color: rgba(53, 83, 248, 0.9); // 登录按钮的颜色
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
             border: none;
             color: white;
-            padding: 12px;
+            padding: 14px;
             width: 100%;
-            font-weight: 500;
+            font-weight: 600;
             font-size: 1.05rem;
-            border-radius: 10px;
-            margin-top: 10px;
-            backdrop-filter: blur(5px);
-            -webkit-backdrop-filter: blur(5px);
+            border-radius: 12px;
+            margin-top: 15px;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
         }
         .btn-login:hover {
-            background-color: rgba(99, 122, 250, 0.8);  // 登录按钮的悬停颜色
             transform: translateY(-2px);
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
         }
         .error-message {
-            color: #ffcccc;
+            color: #ef4444;
             margin-top: 15px;
             text-align: center;
             display: none;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            font-size: 0.95rem;
+            background: rgba(254, 226, 226, 0.5);
+            padding: 8px;
+            border-radius: 8px;
         }
     </style>
 </head>
 <body>
-    <a href="https://github.com/kamanfaiz/CF-Domain-Autocheck" target="_blank" class="github-corner" title="GitHub Repository">
+    <a href="https://github.com/jy02739244/CF-Domain-Autocheck" target="_blank" class="github-corner" title="GitHub Repository">
         <i class="iconfont icon-github1"></i>
     </a>
     <div class="login-container">
@@ -353,21 +500,65 @@ const getHTMLContent = (title) => `
     </script>
     <style>
         :root {
+            /* Light Theme (Default) */
+            --primary-color: #6366f1;
+            --secondary-color: #64748b;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --info-color: #3b82f6;
+            --light-color: #f8fafc;
+            --dark-color: #1e293b;
+            --text-main: #334155;
+            --text-heading: #1e293b;
+            --text-muted: #64748b;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            --border-glass: rgba(255, 255, 255, 0.6);
+            --card-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
+            --domain-note-spacing: 2px;
+            --domain-line-height: 1.15;
+            
+            --bg-blur: 2px; /* 背景模糊程度 */
+            --bg-overlay: rgba(241, 245, 249, 0.6);
+            --card-header-bg: rgba(255, 255, 255, 0.5);
+            --card-border-bottom: rgba(0, 0, 0, 0.05);
+            --input-bg: #fff;
+            --input-border: #e2e8f0;
+            --input-focus-shadow: rgba(99, 102, 241, 0.1);
+            --count-badge-bg: rgba(0, 0, 0, 0.05);
+            --bg-image: url('${typeof BACKGROUND_URL !== 'undefined' ? BACKGROUND_URL : DEFAULT_BACKGROUND}');
+        }
+
+        [data-theme="dark"] {
+            /* Dark Theme */
             --primary-color: #4e54c8;
             --secondary-color: #6c757d;
-            --success-color:rgb(0, 255, 60);
-            --danger-color:rgb(255, 0, 25);
-            --warning-color:rgb(255, 230, 0);
+            --success-color: rgb(0, 255, 60);
+            --danger-color: rgb(255, 0, 25);
+            --warning-color: rgb(255, 230, 0);
             --info-color: #17a2b8;
             --light-color: #f8f9fa;
             --dark-color: #343a40;
-            --domain-note-spacing: 2px; /* 域名和备注标签之间的间距 */
-            --domain-line-height: 1.15; /* 域名换行后的行高 */
+            --text-main: rgba(255, 255, 255, 0.9);
+            --text-heading: #ffffff;
+            --text-muted: rgba(255, 255, 255, 0.6);
+            --bg-glass: rgba(255, 255, 255, 0.15);
+            --border-glass: rgba(255, 255, 255, 0.18);
+            --card-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            
+            --bg-overlay: rgba(0, 0, 0, 0.55);
+            --card-header-bg: rgba(255, 255, 255, 0.1);
+            --card-border-bottom: rgba(255, 255, 255, 0.18);
+            --input-bg: rgba(255, 255, 255, 0.2);
+            --input-border: rgba(255, 255, 255, 0.3);
+            --input-focus-shadow: rgba(255, 255, 255, 0.2);
+            --count-badge-bg: rgba(255, 255, 255, 0.15);
+            --bg-image: url('${typeof BACKGROUND_URL !== 'undefined' ? BACKGROUND_URL : DEFAULT_BACKGROUND}');
         }
         
         body {
             font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
-            background-image: url('${typeof BACKGROUND_URL !== 'undefined' ? BACKGROUND_URL : DEFAULT_BACKGROUND}');
+            background-image: var(--bg-image);
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
@@ -375,6 +566,8 @@ const getHTMLContent = (title) => `
             padding-top: 20px;
             position: relative;
             min-height: 100vh;
+            color: var(--text-main);
+            transition: color 0.3s ease;
         }
         
         /* 移动端背景图片优化 */
@@ -384,8 +577,8 @@ const getHTMLContent = (title) => `
                 background-size: cover;
                 background-position: center top;
                 min-height: 100vh;
-                /* 移动端使用专门的背景图片，如果没有则回退到桌面端背景图片 */
-                background-image: url('${typeof MOBILE_BACKGROUND_URL !== 'undefined' && MOBILE_BACKGROUND_URL ? MOBILE_BACKGROUND_URL : (DEFAULT_MOBILE_BACKGROUND ? DEFAULT_MOBILE_BACKGROUND : (typeof BACKGROUND_URL !== 'undefined' ? BACKGROUND_URL : DEFAULT_BACKGROUND))}');
+                /* 移动端暂不区分主题背景，统一使用 CSS 变量控制的桌面端背景，或者在这里也引入变量逻辑 */
+                background-image: var(--bg-image); 
             }
             
             /* 使用伪元素固定背景，避免缩放问题 */
@@ -396,7 +589,7 @@ const getHTMLContent = (title) => `
                 left: 0;
                 width: 100%;
                 height: 100vh;
-                background-image: url('${typeof MOBILE_BACKGROUND_URL !== 'undefined' && MOBILE_BACKGROUND_URL ? MOBILE_BACKGROUND_URL : (DEFAULT_MOBILE_BACKGROUND ? DEFAULT_MOBILE_BACKGROUND : (typeof BACKGROUND_URL !== 'undefined' ? BACKGROUND_URL : DEFAULT_BACKGROUND))}');
+                background-image: var(--bg-image);
                 background-size: cover;
                 background-position: center;
                 background-repeat: no-repeat;
@@ -412,16 +605,18 @@ const getHTMLContent = (title) => `
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: rgba(0, 0, 0, 0.55); /* 这里调整登录后界面背景图的黑色蒙版不透明度 */
+            background-color: var(--bg-overlay);
+            backdrop-filter: blur(var(--bg-blur));
             z-index: -1;
+            transition: background-color 0.3s ease;
         }
         
         .navbar {
-            background-color: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border-glass);
             margin-bottom: 24px;
             padding: 14px 20px;
             border-radius: 16px;
@@ -435,17 +630,17 @@ const getHTMLContent = (title) => `
         .navbar-brand {
             display: flex;
             align-items: center;
-            font-weight: 600;
-            color: #ffffff;
-            font-size: 1.7rem;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-            gap: 2px; /* 使用gap属性统一控制子元素之间的间距 */
+            font-weight: 700;
+            color: var(--text-heading);
+            font-size: 1.5rem;
+            text-shadow: none;
+            gap: 8px;
         }
         
         .navbar-brand i {
-            font-size: 1.8rem;
-            color: white;
-            margin: 0; /* 移除所有margin */
+            font-size: 1.6rem;
+            color: var(--primary-color); /* 图标使用主色调 */
+            margin: 0;
         }
         
         .logo-link {
@@ -456,8 +651,8 @@ const getHTMLContent = (title) => `
         }
         
         .logo-img {
-            height: 64px;
-            width: 64px;
+            height: 48px;
+            width: 48px;
             object-fit: contain;
             transition: transform 0.3s ease;
         }
@@ -465,7 +660,7 @@ const getHTMLContent = (title) => `
         .logo-img:hover {
             transform: scale(1.1);
             cursor: pointer;
-            filter: brightness(1.2);
+            filter: brightness(1.1);
         }
         
         @keyframes pulse {
@@ -487,22 +682,23 @@ const getHTMLContent = (title) => `
         .btn-logout {
             margin-left: 10px;
             background-color: transparent;
-            border: 1px solid #dc3545;
-            color: #dc3545;
-            padding: 5px 15px;
-            border-radius: 5px;
+            border: 1px solid var(--danger-color);
+            color: var(--danger-color);
+            padding: 6px 16px;
+            border-radius: 8px;
             font-size: 0.9rem;
             cursor: pointer;
             transition: all 0.2s;
+            font-weight: 600;
         }
         
         .btn-logout:hover {
-            background-color: #dc3545;
+            background-color: var(--danger-color);
             color: white;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
         }
         
         .container {
-            max-width: 1200px;
             position: relative;
             z-index: 1;
         }
@@ -511,31 +707,32 @@ const getHTMLContent = (title) => `
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 16px;
-            padding: 12px 20px;
-            background-color: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            margin-bottom: 20px;
+            padding: 16px 24px;
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-glass);
             border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            box-shadow: var(--card-shadow);
             position: relative;
             z-index: 2;
         }
         
         .page-title {
-            font-size: 1.3rem;
-            font-weight: 600;
-            color: #ffffff;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-heading);
             margin: 0;
             display: flex;
             align-items: center;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            text-shadow: none;
         }
         
         .page-title i {
-            margin-right: 8px;
+            margin-right: 10px;
             font-size: 1.2rem;
+            color: var(--primary-color);
         }
         
         .btn-action-group {
@@ -546,103 +743,96 @@ const getHTMLContent = (title) => `
             margin-left: auto;
         }
         
+        /* 按钮通用样式微调 */
+        .btn {
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
         .btn-primary {
             background-color: var(--primary-color);
             border-color: var(--primary-color);
+            color: white;
         }
         
         .btn-primary:hover {
-            background-color: #3f44ae;
-            border-color: #3f44ae;
+            background-color: #4f46e5;
+            border-color: #4f46e5;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
         }
         
         .card {
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            border: 1px solid var(--border-glass);
             border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-            margin-bottom: 8px; /* 进一步减小卡片间的垂直间距 */
-            transition: all 0.3s;
-            overflow: hidden !important; /* 确保内容不会溢出 */
+            box-shadow: var(--card-shadow);
+            margin-bottom: 12px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden !important;
             position: relative;
-            z-index: 1; /* 设置卡片的基础z-index */
+            z-index: 1;
             width: 100%;
-            background-color: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
+            background-color: var(--bg-glass);
+            /* backdrop-filter: blur(20px);  Removed for performance */
+            /* -webkit-backdrop-filter: blur(20px); Removed for performance */
         }
         
         /* ===== 卡片头部样式 - 开始 ===== */
-        /* 卡片头部容器 */
         .card-header {
-            background-color: rgba(255, 255, 255, 0.1);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.18);
-            padding: 15px 0; /* 移除左右内边距，改为在各元素上单独控制 */
-            padding-top: 12px;
-            padding-bottom: 12px;
+            background-color: var(--card-header-bg);
+            border-bottom: 1px solid var(--card-border-bottom);
+            padding: 12px 0;
             position: relative;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            overflow: hidden; /* 防止内容溢出 */
+            overflow: hidden;
             border-top-left-radius: 16px;
             border-top-right-radius: 16px;
-            gap: 0; /* 移除间距，改为在各元素上单独控制 */
-            min-height: 84px; /* 最小高度 */
-            height: auto; /* 自动调整高度以适应内容 */
-            max-height: 140px; /* 最大高度限制 */
-            box-sizing: border-box; /* 确保padding不会增加元素高度 */
+            gap: 0;
+            min-height: 72px;
+            height: auto;
+            max-height: 140px;
+            box-sizing: border-box;
         }
         
-        /* 状态指示圆点 */
         .status-dot {
             display: inline-block;
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            margin-right: 10px; /* 与域名文字的间距 */
-            margin-left: 20px; /* 与卡片左边的间距 */
+            margin-right: 12px;
+            margin-left: 20px;
             vertical-align: middle;
             flex-shrink: 0;
         }
         
-        .status-dot.expired {
-            background-color: var(--danger-color);
-            box-shadow: 0 0 5px var(--danger-color);
-        }
+        .status-dot.expired { background-color: var(--danger-color); box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2); }
+        .status-dot.warning { background-color: var(--warning-color); box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2); }
+        .status-dot.safe { background-color: var(--success-color); box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); }
         
-        .status-dot.warning {
-            background-color: var(--warning-color);
-            box-shadow: 0 0 5px var(--warning-color);
-        }
-        
-        .status-dot.safe {
-            background-color: var(--success-color);
-            box-shadow: 0 0 5px var(--success-color);
-        }
-        
-        /* 域名标题区域 */
         .domain-header {
             display: flex;
             flex-direction: column;
             justify-content: center;
             flex: 1;
-            min-width: 0; /* 解决flex子项目溢出问题 */
-            max-width: calc(100% - 2px); /* 限制最大宽度，为右侧状态标签留出空间 */
-            overflow: hidden; /* 确保内容不会溢出 */
-            padding-left: 5px; /* 与小圆点的间距 */
-            padding-right: 2px; /* 与右侧状态标签的间距 */
-            transition: all 0.3s ease; /* 添加过渡效果 */
-            min-height: 60px; /* 最小高度，可根据内容自动增加 */
-            height: auto; /* 自动调整高度以适应内容 */
-            max-height: 120px; /* 设置最大高度限制 */
+            min-width: 0;
+            max-width: calc(100% - 2px);
+            overflow: hidden;
+            padding-left: 5px;
+            padding-right: 2px;
+            transition: all 0.3s ease;
+            min-height: 50px;
+            height: auto;
+            max-height: 120px;
         }
         
         .domain-header h5 {
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis; /* 添加省略号 */
-            color: #ffffff;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            color: var(--text-heading);
+            text-shadow: none;
             font-size: 1.25rem; /* 设置域名字体大小 */
             font-weight: 600; /* 加粗字体 */
             transition: white-space 0.3s ease; /* 添加过渡效果 */
@@ -650,172 +840,150 @@ const getHTMLContent = (title) => `
             line-height: 1.5;
         }
         
-        /* 展开状态下的域名显示 */
         .domain-card.expanded .domain-header h5 {
-            white-space: normal; /* 允许换行 */
-            word-wrap: break-word; /* 确保长单词也能换行 */
-            word-break: break-all; /* 在任何字符间换行 */
+            white-space: normal;
+            word-wrap: break-word;
+            word-break: break-all;
         }
         
-        /* 域名容器样式 */
         .domain-name-container {
             display: flex;
             flex-direction: column;
         }
         
-        /* 域名标题样式 */
         .domain-title {
             display: inline-block;
-            margin-bottom: 0; /* 确保没有额外的底部边距 */
+            margin-bottom: 0;
         }
         
-        /* 备注标签样式 */
         .domain-header .domain-meta {
             font-size: 0.75rem;
-            color: rgba(255, 255, 255, 0.8);
+            color: var(--text-muted);
             line-height: 1.2;
         }
         
-        /* 展开状态下的域名显示 */
         .domain-card.expanded .domain-title {
-            display: block; /* 确保域名可以正常换行 */
-        }
-        
-        /* 域名文字样式 */
-        .domain-text {
-            display: inline;
-        }
-        
-        /* 展开状态下域名文字样式 */
-        .domain-card.expanded .domain-title .domain-text {
-            display: inline-block;
-            line-height: var(--domain-line-height); /* 控制行高，即行间距 */
-        }
-        
-        /* 确保展开状态下域名文字能够正确换行 */
-        .domain-card.expanded .domain-title {
+            display: block;
             word-break: break-all;
             word-wrap: break-word;
         }
         
-        /* 间隔元素样式 */
+        .domain-text {
+            display: inline;
+        }
+        
+        .domain-card.expanded .domain-title .domain-text {
+            display: inline-block;
+            line-height: var(--domain-line-height);
+        }
+        
         .spacer {
             display: block;
             width: 100%;
-            /* 高度由内联样式通过CSS变量控制 */
-            flex-shrink: 0; /* 防止被压缩 */
+            flex-shrink: 0;
         }
         
-        /* 自定义备注样式 - 多种颜色标签风格 */
         .domain-meta .text-info, .domain-meta [class*="tag-"], .note-preview {
-            background-color: #3B82F6; /* 默认蓝色 */
+            background-color: var(--info-color);
             color: white !important;
-            font-weight: 500;
-            padding: 3px 12px;
-            border-radius: 16px;
+            font-weight: 600;
+            padding: 2px 10px;
+            border-radius: 6px;
             display: inline-block;
-            font-size: 0.8rem;
-            box-shadow: 0 1px 3px rgba(59, 130, 246, 0.3);
+            font-size: 0.75rem;
+            box-shadow: none;
             letter-spacing: 0.2px;
         }
         
-        /* 自定义备注颜色类 - 只修改颜色，保留原有样式 */
-        .text-info.tag-blue { background-color: #3B82F6 !important; box-shadow: 0 1px 3px rgba(59, 130, 246, 0.3) !important; }
-        .text-info.tag-green { background-color: #10B981 !important; box-shadow: 0 1px 3px rgba(16, 185, 129, 0.3) !important; }
-        .text-info.tag-red { background-color: #EF4444 !important; box-shadow: 0 1px 3px rgba(239, 68, 68, 0.3) !important; }
-        .text-info.tag-yellow { background-color: #F59E0B !important; box-shadow: 0 1px 3px rgba(245, 158, 11, 0.3) !important; }
-        .text-info.tag-purple { background-color: #8B5CF6 !important; box-shadow: 0 1px 3px rgba(139, 92, 246, 0.3) !important; }
-        .text-info.tag-pink { background-color: #EC4899 !important; box-shadow: 0 1px 3px rgba(236, 72, 153, 0.3) !important; }
-        .text-info.tag-indigo { background-color: #6366F1 !important; box-shadow: 0 1px 3px rgba(99, 102, 241, 0.3) !important; }
-        .text-info.tag-gray { background-color: #6B7280 !important; box-shadow: 0 1px 3px rgba(107, 114, 128, 0.3) !important; }
+        .text-info.tag-blue { background-color: #3B82F6 !important; }
+        .text-info.tag-green { background-color: #10B981 !important; }
+        .text-info.tag-red { background-color: #EF4444 !important; }
+        .text-info.tag-yellow { background-color: #F59E0B !important; }
+        .text-info.tag-purple { background-color: #8B5CF6 !important; }
+        .text-info.tag-pink { background-color: #EC4899 !important; }
+        .text-info.tag-indigo { background-color: #6366F1 !important; }
+        .text-info.tag-gray { background-color: #6B7280 !important; }
         
-        /* 分类容器样式 */
         .domain-group-container {
-            margin-bottom: 4px; /* 分类之间的间距 */
+            margin-bottom: 4px;
         }
         
-        /* 主容器底部间距统一 */
         .container {
-            margin-bottom: 60px; /* 统一设置与页脚的间距 */
+            margin-bottom: 60px;
         }
         
-        /* 空状态容器间距 - 桌面端 */
         .empty-state-container {
-            margin-top: 2px !important; /* 与分类标题和卡片的间距保持一致 */
-            margin-bottom: 0 !important; /* 确保空状态容器底部间距与其他状态一致 */
+            margin-top: 2px !important;
+            margin-bottom: 0 !important;
         }
         
-        /* 确保分类标题与卡片左对齐 */
         .col-12.px-1-5 {
-            padding-left: 0.375rem !important; /* 与卡片列相同的左内边距 */
+            padding-left: 0.375rem !important;
         }
         
-        /* 分类标题样式 */
         .category-header {
-            padding: 8px 0; /* 移除左右内边距 */
-            margin-bottom: 2px; /* 分类标题和卡片的间距 */
-            margin-left: 10px; /* 增加左边距，使文字与卡片对齐 */
-            display: block; /* 改为块级元素，确保宽度占满 */
+            padding: 8px 0;
+            margin-bottom: 4px;
+            margin-left: 10px;
+            display: block;
             min-width: 120px;
         }
         
         .category-title {
             margin: 0;
             padding: 0;
-            color: white;
-            font-size: 1.3rem;
-            font-weight: 600;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+            color: var(--text-heading);
+            font-size: 1.2rem;
+            font-weight: 700;
+            text-shadow: none;
             display: flex;
             align-items: center;
         }
 
-        /* 毛玻璃风格的统计徽章 */
         .count-badge {
-            background: rgba(255, 255, 255, 0.15);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(10px);
-            color: rgba(255, 255, 255, 0.9);
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.375rem;
-            font-size: 0.875rem;
-            font-weight: 500;
+            background: rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            backdrop-filter: none;
+            color: var(--text-muted);
+            padding: 0.15rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
             margin-left: 0.5rem;
         }
         
-        /* 状态区域 */
-.domain-status {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    flex-shrink: 0; /* 防止被压缩 */
-    min-width: 100px; /* 增加最小宽度，确保状态标签有足够空间 */
-    padding-right: 20px; /* 下拉按钮与卡片右边的间距 */
-    margin-left: 10px; /* 与域名区域的间距 */
-}
+        .domain-status {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            flex-shrink: 0;
+            min-width: 100px;
+            padding-right: 20px;
+            margin-left: 10px;
+        }
         
         .domain-status .badge {
-            margin-right: 10px; /* 与下拉箭头的间距 */
-            white-space: nowrap; /* 确保标签文本不换行 */
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-weight: 500;
+            margin-right: 10px;
+            white-space: nowrap;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-weight: 600;
             color: white;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            text-shadow: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
         
         .badge .iconfont {
-            margin-right: 3px;
+            margin-right: 4px;
             font-size: 0.9rem;
             vertical-align: middle;
             color: white;
         }
         
-        /* 下拉按钮 */
         .toggle-details {
             padding: 0;
-            margin-left: 0; /* 与状态标签的间距 */
-            color: white;
+            margin-left: 0;
+            color: var(--text-muted);
             background: none;
             border: none;
             box-shadow: none;
@@ -827,14 +995,16 @@ const getHTMLContent = (title) => `
             justify-content: center;
             line-height: 1;
             text-decoration: none !important;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            text-shadow: none;
+            transition: color 0.2s;
         }
         
         .toggle-details:hover {
-            color: rgba(255, 255, 255, 0.8);
+            color: var(--primary-color);
+            background-color: rgba(99, 102, 241, 0.1);
+            border-radius: 50%;
         }
         
-        /* 图标容器 */
         .toggle-icon-container {
             position: relative;
             width: 16px;
@@ -842,15 +1012,14 @@ const getHTMLContent = (title) => `
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: hidden; /* 防止内容溢出 */
+            overflow: hidden;
             line-height: 1;
         }
         
-        /* 箭头图标 */
         .toggle-icon {
             font-size: 16px;
             transition: transform 0.3s ease;
-            margin-right: 0 !important; /* 覆盖默认的margin-right */
+            margin-right: 0 !important;
             display: block;
             line-height: 1;
         }
@@ -875,23 +1044,25 @@ const getHTMLContent = (title) => `
         
         /* 骨架屏样式 */
         .skeleton-card {
-            background-color: rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
+            background-color: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            box-shadow: var(--card-shadow);
             animation: skeleton-pulse 1.5s infinite ease-in-out;
         }
         
         .skeleton-header {
-            background-color: rgba(255, 255, 255, 0.15);
+            background-color: var(--card-header-bg);
             padding: 16px;
-            border-top-left-radius: 12px;
-            border-top-right-radius: 12px;
+            border-bottom: 1px solid var(--card-border-bottom);
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
         }
         
         .skeleton-text-lg {
             height: 24px;
-            background-color: rgba(255, 255, 255, 0.2);
+            background-color: rgba(128, 128, 128, 0.1);
             border-radius: 4px;
             margin-bottom: 8px;
             width: 70%;
@@ -899,14 +1070,14 @@ const getHTMLContent = (title) => `
         
         .skeleton-text-sm {
             height: 16px;
-            background-color: rgba(255, 255, 255, 0.2);
+            background-color: rgba(128, 128, 128, 0.1);
             border-radius: 4px;
             width: 50%;
         }
         
         .skeleton-text {
             height: 16px;
-            background-color: rgba(255, 255, 255, 0.2);
+            background-color: rgba(128, 128, 128, 0.1);
             border-radius: 4px;
             margin-bottom: 8px;
             width: 90%;
@@ -914,7 +1085,7 @@ const getHTMLContent = (title) => `
         
         .skeleton-progress {
             height: 24px;
-            background-color: rgba(255, 255, 255, 0.2);
+            background-color: rgba(128, 128, 128, 0.1);
             border-radius: 12px;
             margin-top: 16px;
         }
@@ -1000,16 +1171,16 @@ const getHTMLContent = (title) => `
         /* 添加样式使SVG中的文本不旋转 */
         .progress-ring text {
             transform: rotate(90deg); /* 抵消父元素的旋转 */
-            fill: #ffffff; /* 改为白色 */
+            fill: var(--text-heading); /* 改为标题颜色 */
             font-size: 14px;
             font-weight: bold;
             font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
             dominant-baseline: central;
             text-anchor: middle;
             paint-order: stroke;
-            stroke: rgba(0, 0, 0, 0.3); /* 改为半透明黑色描边 */
-            stroke-width: 1px;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); /* 添加文字阴影 */
+            stroke: none; /* 移除描边 */
+            stroke-width: 0;
+            text-shadow: none; /* 移除阴影 */
         }
         
         .progress-ring-circle {
@@ -1022,8 +1193,8 @@ const getHTMLContent = (title) => `
         .progress-percent-text {
             font-size: 18px; /* 再次增加字体大小以适应更大的圆圈 */
             font-weight: bold;
-            color: #ffffff;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            color: var(--text-heading);
+            text-shadow: none;
         }
         
         .card-body {
@@ -1112,7 +1283,7 @@ const getHTMLContent = (title) => `
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
-            color: rgba(255, 255, 255, 0.8);
+            color: var(--text-muted);
             font-size: 0.75rem;
         }
         
@@ -1531,7 +1702,7 @@ const getHTMLContent = (title) => `
         
         .card-text {
             margin-bottom: 6px;
-            color: rgba(255, 255, 255, 0.9);
+            color: var(--text-main);
             font-size: 0.85rem;
             display: flex;
             align-items: center;
@@ -1542,16 +1713,16 @@ const getHTMLContent = (title) => `
         }
         
         .card-text strong {
-            color: #ffffff;
+            color: var(--text-heading);
             font-weight: 600;
             font-size: 0.85rem;
             margin-right: 4px;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            text-shadow: none;
         }
         
         .card-text .iconfont {
             margin-right: 6px;
-            color: rgba(255, 255, 255, 0.9);
+            color: var(--primary-color);
             font-size: 0.85rem;
             width: 16px;
             text-align: center;
@@ -1561,61 +1732,62 @@ const getHTMLContent = (title) => `
         
         .modal-content {
             border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            background-color: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            overflow: hidden; /* 确保内部元素不会超出圆角边界 */
+            border: 1px solid var(--border-glass);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+            background-color: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            overflow: hidden;
+            color: var(--text-main);
         }
         
         .modal-header {
-            border-bottom: 1px solid rgba(255, 255, 255, 0.18);
-            background-color: rgba(255, 255, 255, 0.1);
-            padding: 15px 20px;
-            color: white;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid var(--card-border-bottom);
+            background-color: var(--card-header-bg);
+            padding: 16px 24px;
+            color: var(--text-heading);
+            text-shadow: none;
             border-top-left-radius: 16px;
             border-top-right-radius: 16px;
         }
         
         .modal-footer {
-            border-top: 1px solid rgba(255, 255, 255, 0.18);
-            padding: 15px 20px;
+            border-top: 1px solid var(--card-border-bottom);
+            padding: 16px 24px;
             border-bottom-left-radius: 16px;
             border-bottom-right-radius: 16px;
-            background-color: rgba(255, 255, 255, 0.05);
+            background-color: var(--count-badge-bg); /* Use this as a subtle bg */
         }
         
         /* 确保下拉菜单显示在最上层 */
         .dropdown-menu {
             z-index: 1050 !important;
-            background-color: rgba(60, 65, 70, 0.75) !important; /* 更浅的背景色 */
-            backdrop-filter: blur(15px) !important;
-            -webkit-backdrop-filter: blur(15px) !important;
-            border: 1px solid rgba(255, 255, 255, 0.25) !important;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35) !important;
+            background-color: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(10px) !important;
+            -webkit-backdrop-filter: blur(10px) !important;
+            border: 1px solid var(--border-glass) !important;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1) !important;
             padding: 8px !important;
-            border-radius: 10px !important;
+            border-radius: 12px !important;
         }
         
         .dropdown-item {
             font-size: 0.85rem;
-            padding: 0.5rem 1rem;
-            color: white !important;
-            border-radius: 6px;
+            padding: 0.6rem 1rem;
+            color: var(--text-main) !important;
+            border-radius: 8px;
             margin-bottom: 2px;
             font-weight: 500;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            text-shadow: none;
         }
         
         .dropdown-item:hover {
-            background-color: rgba(255, 255, 255, 0.25) !important;
-            color: white !important;
+            background-color: rgba(99, 102, 241, 0.1) !important;
+            color: var(--primary-color) !important;
         }
         
         .dropdown-divider {
-            border-top: 1px solid rgba(255, 255, 255, 0.25) !important;
+            border-top: 1px solid rgba(0, 0, 0, 0.05) !important;
             margin: 6px 0;
         }
         
@@ -1626,90 +1798,82 @@ const getHTMLContent = (title) => `
         }
         
         .form-label {
-            font-weight: 500;
-            color: white;
+            font-weight: 600;
+            color: var(--text-heading);
             display: flex;
             align-items: center;
             gap: 5px;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            text-shadow: none;
+            margin-bottom: 8px;
         }
         
         .form-label .iconfont,
         .modal-body h6 .iconfont,
         .modal-body .form-text .iconfont {
-            color: rgba(255, 255, 255, 0.9);
+            color: var(--primary-color);
             margin-right: 0;
-            font-size: 0.95rem;
+            font-size: 1rem;
         }
         
         .modal-body {
-            color: white;
+            color: var(--text-main);
+            padding: 24px;
         }
         
         .modal-body .form-text {
-            color: rgba(255, 255, 255, 0.8);
+            color: var(--text-muted);
         }
         
         .form-control {
             border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            border: 1px solid var(--input-border);
             padding: 10px 15px;
-            background-color: rgba(255, 255, 255, 0.2);
-            color: white;
-            backdrop-filter: blur(5px);
-            -webkit-backdrop-filter: blur(5px);
+            background-color: var(--input-bg);
+            color: var(--text-main);
+            transition: all 0.2s;
         }
         
         .form-control:focus {
-            border-color: rgba(255, 255, 255, 0.5);
-            box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.25);
-            background-color: rgba(255, 255, 255, 0.25);
-            color: white;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px var(--input-focus-shadow);
+            background-color: var(--input-bg);
+            color: var(--text-main);
         }
         
         .form-control::placeholder {
-            color: rgba(255, 255, 255, 0.7);
+            color: var(--text-muted);
         }
         
         /* 自动填充高亮样式 */
         .form-control.auto-filled,
         .form-select.auto-filled {
-            background-color: rgba(74, 222, 128, 0.15) !important;
-            border-color: rgba(74, 222, 128, 0.6) !important;
-            box-shadow: 0 0 0 0.2rem rgba(74, 222, 128, 0.25) !important;
-            animation: autoFillGlow 2s ease-in-out;
+            background-color: rgba(16, 185, 129, 0.05) !important;
+            border-color: rgba(16, 185, 129, 0.3) !important;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1) !important;
+            animation: none;
         }
         
         @keyframes autoFillGlow {
-            0% {
-                background-color: rgba(74, 222, 128, 0.3);
-                box-shadow: 0 0 0 0.3rem rgba(74, 222, 128, 0.4);
-            }
-            100% {
-                background-color: rgba(74, 222, 128, 0.15);
-                box-shadow: 0 0 0 0.2rem rgba(74, 222, 128, 0.25);
-            }
+            /* 移除动画，保持简洁 */
         }
         
         .form-select {
-            background-color: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: white;
+            background-color: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--text-main);
             border-radius: 10px;
-            backdrop-filter: blur(5px);
-            -webkit-backdrop-filter: blur(5px);
+            padding: 10px 36px 10px 15px;
         }
         
         .form-select:focus {
-            border-color: rgba(255, 255, 255, 0.5);
-            box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.25);
-            background-color: rgba(255, 255, 255, 0.25);
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px var(--input-focus-shadow);
         }
         
         /* 添加select下拉选项的样式 */
         .form-select option {
-            background-color: #333;
-            color: white;
+            background-color: var(--input-bg);
+            color: var(--text-main);
             padding: 8px;
         }
         
@@ -1835,14 +1999,17 @@ const getHTMLContent = (title) => `
                 <img src="${typeof LOGO_URL !== 'undefined' ? LOGO_URL : DEFAULT_LOGO}" alt="Logo" class="logo-img">
             </a>
                 <i class="iconfont icon-domain iconfont-lg"></i>
-                <span style="color: white; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">${title}</span>
+                <span style="text-shadow: none;">${title}</span>
             </span>
             <div class="navbar-actions">
-                <button class="btn btn-secondary me-3" data-bs-toggle="modal" data-bs-target="#settingsModal">
-                    <i class="iconfont icon-gear" style="color: white;"></i> <span style="color: white;">系统设置</span>
+                <button class="btn btn-outline-primary me-2 btn-icon-only" id="themeToggleBtn" title="切换主题">
+                    <i class="iconfont icon-moon" id="themeIcon"></i>
                 </button>
-                <button class="btn btn-danger" onclick="logout()">
-                    <i class="iconfont icon-sign-out-alt" style="color: white;"></i> <span style="color: white;">退出</span>
+                <button class="btn btn-secondary me-3" data-bs-toggle="modal" data-bs-target="#settingsModal">
+                    <i class="iconfont icon-gear"></i> <span>系统设置</span>
+                </button>
+                <button class="btn btn-logout" onclick="logout()">
+                    <i class="iconfont icon-sign-out-alt"></i> <span>退出</span>
                 </button>
             </div>
         </nav>
@@ -1851,7 +2018,12 @@ const getHTMLContent = (title) => `
         <div class="page-header">
             <h1 class="page-title"><i class="iconfont icon-list-ul"></i> 域名列表 <span class="count-badge" id="totalDomainCount">(0)</span></h1>
             <div class="btn-action-group">
-                                  <div class="btn-group me-2">
+                  <div class="me-2" style="min-width: 140px;">
+                      <select class="form-select form-select-sm" id="categoryFilter" aria-label="分类筛选">
+                          <option value="all">所有分类</option>
+                      </select>
+                  </div>
+                  <div class="btn-group me-2">
                       <button class="btn btn-outline-info btn-action view-option" data-view="collapse-all" type="button" style="transition: background-color 0.2s, color 0.2s;">
                          <i class="iconfont icon-quanjusuoxiao"></i> <span class="view-text">折叠</span>
                       </button>
@@ -1922,6 +2094,10 @@ const getHTMLContent = (title) => `
                         <div class="mb-3">
                             <label for="registrar" class="form-label"><i class="iconfont icon-house-chimney"></i> 注册厂商</label>
                             <input type="text" class="form-control" id="registrar" placeholder="请输入注册厂商名称，如阿里云、腾讯云等">
+                        </div>
+                        <div class="mb-3">
+                            <label for="registeredAccount" class="form-label"><i class="iconfont icon-user"></i> 注册账号</label>
+                            <input type="text" class="form-control" id="registeredAccount" placeholder="请输入注册该域名的账号/邮箱">
                         </div>
                         <div class="mb-3">
                             <label for="domainCategory" class="form-label"><i class="iconfont icon-fenlei"></i> 分类</label>
@@ -2010,7 +2186,7 @@ const getHTMLContent = (title) => `
                         <div class="mb-3" id="lastRenewedContainer" style="display: none;">
                             <div class="d-flex align-items-center">
                                 <label class="form-label mb-0 me-3">上次续期时间:</label>
-                                <span id="lastRenewedDisplay" class="text-white me-2"></span>
+                                <span id="lastRenewedDisplay" class="text-dark me-2"></span>
                                 <button type="button" class="btn btn-sm btn-danger" id="clearLastRenewed"><span style="color: white;">清除</span></button>
                             </div>
                             <input type="hidden" id="lastRenewed" value="">
@@ -2097,6 +2273,43 @@ const getHTMLContent = (title) => `
                 </div>
                 <div class="modal-body">
                     <form id="settingsForm">
+                        <h6 class="mb-3" style="display: flex; align-items: center; gap: 5px;"><i class="iconfont icon-monitor" style="color: white;"></i> 显示设置</h6>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="expandDomainsEnabled">
+                            <label class="form-check-label" for="expandDomainsEnabled">默认展开所有域名</label>
+                            <div class="form-text">开启后，进入页面时将自动展开所有域名的详细信息</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label" style="font-size: 0.95rem;">剩余进度样式</label>
+                            <div class="d-flex gap-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="progressStyle" id="progressStyleCircle" value="circle" checked>
+                                    <label class="form-check-label" for="progressStyleCircle">圆环</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="progressStyle" id="progressStyleBar" value="bar">
+                                    <label class="form-check-label" for="progressStyleBar">进度条</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" style="font-size: 0.95rem;">卡片布局 (PC端)</label>
+                            <div class="d-flex gap-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="cardLayout" id="cardLayout3" value="3">
+                                    <label class="form-check-label" for="cardLayout3">3 列</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="cardLayout" id="cardLayout4" value="4" checked>
+                                    <label class="form-check-label" for="cardLayout4">4 列</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr style="border-color: rgba(255, 255, 255, 0.1);">
+                        
                         <h6 class="mb-3" style="display: flex; align-items: center; gap: 5px;"><i class="iconfont icon-telegram" style="color: white;"></i> Telegram通知设置</h6>
                         <div class="mb-3 form-check">
                             <input type="checkbox" class="form-check-input" id="telegramEnabled">
@@ -2223,6 +2436,7 @@ const getHTMLContent = (title) => `
         let telegramConfig = {};
         let currentSortField = 'suffix'; // 默认排序字段改为域名后缀
         let currentSortOrder = 'asc'; // 默认排序顺序
+        let currentCategoryFilter = 'all'; // 当前分类筛选
         let viewMode = 'auto-collapse'; // 默认查看模式：auto-collapse (自动折叠), expand-all (全部展开), collapse-all (全部折叠)
         
         // 将天数转换为年月日格式
@@ -2269,6 +2483,9 @@ const getHTMLContent = (title) => `
             setTimeout(() => {
                 // 使用Promise.all并行加载数据
                 Promise.all([loadDomains(), loadCategories(), loadTelegramConfig()])
+                    .then(() => {
+                        renderDomainList();
+                    })
                     .catch(error => showAlert('danger', '数据加载失败: ' + error.message));
             }, 300);
             
@@ -2348,6 +2565,7 @@ const getHTMLContent = (title) => `
                 document.getElementById('expiryDate').classList.remove('auto-filled');
                 document.getElementById('renewCycleValue').classList.remove('auto-filled');
                 document.getElementById('renewCycleUnit').classList.remove('auto-filled');
+                document.getElementById('renewLink').classList.remove('auto-filled');
             });
             
             // 添加模态框焦点管理 - 让Bootstrap自己处理aria-hidden
@@ -2397,16 +2615,19 @@ const getHTMLContent = (title) => `
                 }
                 
                 // 验证域名格式 - 更宽松的域名格式验证
-                const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.[a-zA-Z]{2,}$/;
+                const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
                 if (!domainRegex.test(domain)) {
-                    showWhoisStatus('仅支持自动查询一级域名', 'danger');
+                    showWhoisStatus('域名格式不正确', 'danger');
                     return;
                 }
                 
-                // 验证是否为一级域名（只能有一个点）
+                // 验证是否为一级域名（只能有一个点），pp.ua及DigitalPlat特定域名除外（允许二级域名）
                 const dotCount = domain.split('.').length - 1;
+                const lowerDomain = domain.toLowerCase();
+                const isPpUa = lowerDomain.endsWith('.pp.ua');
+                const isDigitalPlat = lowerDomain.endsWith('.qzz.io') || lowerDomain.endsWith('.dpdns.org') || lowerDomain.endsWith('.us.kg') || lowerDomain.endsWith('.xx.kg');
                 
-                if (dotCount !== 1) {
+                if (dotCount !== 1 && !((isPpUa || isDigitalPlat) && dotCount === 2)) {
                     if (dotCount === 0) {
                         showWhoisStatus('请输入完整的域名（如：example.com）', 'danger');
                     } else {
@@ -2437,6 +2658,7 @@ const getHTMLContent = (title) => `
                 document.getElementById('expiryDate').value = '';
                 document.getElementById('renewCycleValue').value = '1';
                 document.getElementById('renewCycleUnit').value = 'year';
+                document.getElementById('renewLink').value = '';
                 
                 // 清除高亮样式
                 document.getElementById('registrar').classList.remove('auto-filled');
@@ -2444,6 +2666,7 @@ const getHTMLContent = (title) => `
                 document.getElementById('expiryDate').classList.remove('auto-filled');
                 document.getElementById('renewCycleValue').classList.remove('auto-filled');
                 document.getElementById('renewCycleUnit').classList.remove('auto-filled');
+                document.getElementById('renewLink').classList.remove('auto-filled');
                 
                 // 清除查询状态信息
                 const statusDiv = document.getElementById('whoisQueryStatus');
@@ -2460,10 +2683,10 @@ const getHTMLContent = (title) => `
             document.getElementById('renewPeriodValue').addEventListener('input', updateNewExpiryDate);
             document.getElementById('renewPeriodUnit').addEventListener('change', updateNewExpiryDate);
             
-            // 注册时间和续期周期变化时自动计算到期日期
-            document.getElementById('registrationDate').addEventListener('change', calculateExpiryDate);
-            document.getElementById('renewCycleValue').addEventListener('input', calculateExpiryDate);
-            document.getElementById('renewCycleUnit').addEventListener('change', calculateExpiryDate);
+            // 注册时间和续期周期变化时不再自动计算到期日期，解除强制关联
+            // document.getElementById('registrationDate').addEventListener('change', calculateExpiryDate);
+            // document.getElementById('renewCycleValue').addEventListener('input', calculateExpiryDate);
+            // document.getElementById('renewCycleUnit').addEventListener('change', calculateExpiryDate);
             
             // Telegram启用状态变化
             document.getElementById('telegramEnabled').addEventListener('change', function() {
@@ -2645,6 +2868,12 @@ const getHTMLContent = (title) => `
                 });
             });
             
+            // 分类筛选变更事件
+            document.getElementById('categoryFilter').addEventListener('change', function() {
+                currentCategoryFilter = this.value;
+                renderDomainList();
+            });
+            
             // 添加点击空白处折叠卡片的功能
             document.addEventListener('click', function(e) {
                 // 检查是否处于"折叠"模式
@@ -2724,6 +2953,34 @@ const getHTMLContent = (title) => `
                     }
                 }
             });
+            
+            // 主题切换功能
+            const themeToggleBtn = document.getElementById('themeToggleBtn');
+            const themeIcon = document.getElementById('themeIcon');
+            
+            // 初始化主题
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeIcon(savedTheme);
+            
+            themeToggleBtn.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+                updateThemeIcon(newTheme);
+            });
+            
+            function updateThemeIcon(theme) {
+                if (theme === 'dark') {
+                    themeIcon.className = 'iconfont icon-sun';
+                    themeToggleBtn.title = '切换到亮色主题';
+                } else {
+                    themeIcon.className = 'iconfont icon-moon';
+                    themeToggleBtn.title = '切换到暗色主题';
+                }
+            }
         }
         
         // 自定义备注颜色预览函数
@@ -2777,11 +3034,6 @@ const getHTMLContent = (title) => `
                 
                 domains = await response.json();
                 
-                // 确保DOM元素已加载后再渲染
-                setTimeout(async () => {
-                    await renderDomainList();
-                }, 100);
-                
                 return domains; // 返回加载的域名数据
             } catch (error) {
                 showAlert('danger', '加载域名列表失败: ' + error.message);
@@ -2799,20 +3051,19 @@ const getHTMLContent = (title) => `
             }
             
             try {
-                // 创建骨架屏
-                domainListContainer.innerHTML = 
-                    '<div class="col-md-6 col-lg-4 domain-column px-1-5">' +
-                        generateSkeletonCard() +
-                        generateSkeletonCard() +
-                    '</div>' +
-                    '<div class="col-md-6 col-lg-4 domain-column px-1-5">' +
-                        generateSkeletonCard() +
-                        generateSkeletonCard() +
-                    '</div>' +
-                    '<div class="col-md-6 col-lg-4 domain-column px-1-5">' +
-                        generateSkeletonCard() +
-                        generateSkeletonCard() +
-                    '</div>';
+                const cardLayout = telegramConfig.cardLayout || '4';
+                const numColumns = parseInt(cardLayout);
+                let html = '';
+                
+                for (let i = 0; i < numColumns; i++) {
+                    const colClass = numColumns === 4 ? 'col-md-6 col-lg-3' : 'col-md-6 col-lg-4';
+                    html += '<div class="' + colClass + ' domain-column px-1-5">';
+                    html += generateSkeletonCard();
+                    html += generateSkeletonCard();
+                    html += '</div>';
+                }
+                
+                domainListContainer.innerHTML = html;
             } catch (error) {
                 // 忽略骨架屏设置失败
             }
@@ -2842,9 +3093,66 @@ const getHTMLContent = (title) => `
                 telegramConfig = await response.json();
                 
                 // 更新表单
+                document.getElementById('expandDomainsEnabled').checked = telegramConfig.expandDomains || false;
+                
+                // 设置进度样式单选框
+                const progressStyle = telegramConfig.progressStyle || 'bar';
+                if (progressStyle === 'bar') {
+                    document.getElementById('progressStyleBar').checked = true;
+                } else {
+                    document.getElementById('progressStyleCircle').checked = true;
+                }
+
+                // 设置卡片布局单选框
+                const cardLayout = telegramConfig.cardLayout || '4';
+                if (cardLayout === '4') {
+                    document.getElementById('cardLayout4').checked = true;
+                } else {
+                    document.getElementById('cardLayout3').checked = true;
+                }
+                
                 document.getElementById('telegramEnabled').checked = telegramConfig.enabled;
                 document.getElementById('telegramSettings').style.display = telegramConfig.enabled ? 'block' : 'none';
                 document.getElementById('notifyDays').value = telegramConfig.notifyDays || 30;
+
+                // 如果配置了默认展开域名，且当前不在"全部展开"模式
+                if (telegramConfig.expandDomains && viewMode !== 'expand-all') {
+                    // 设置视图模式
+                    viewMode = 'expand-all';
+                    // 尝试触发一次视图更新(如果域名列表已经加载)
+                    setTimeout(() => {
+                        const expandBtn = document.querySelector('.view-option[data-view="expand-all"]');
+                        if (expandBtn) {
+                            // 更新按钮状态
+                            document.querySelectorAll('.view-option').forEach(btn => {
+                                if (btn.dataset.view === 'expand-all') {
+                                    btn.classList.remove('btn-outline-info');
+                                    btn.classList.add('btn-info');
+                                } else {
+                                    btn.classList.add('btn-outline-info');
+                                    btn.classList.remove('btn-info');
+                                }
+                            });
+                            // 实际执行展开逻辑
+                            // 直接调用click可能会导致重复请求或逻辑冲突，这里直接操作DOM
+                            const allDetails = document.querySelectorAll('.domain-card .collapse');
+                            allDetails.forEach(detail => {
+                                detail.classList.add('show');
+                                detail.style.height = 'auto';
+                                detail.style.overflow = 'visible';
+                                const domainCard = detail.closest('.domain-card');
+                                if (domainCard) {
+                                    const btn = domainCard.querySelector('.toggle-details');
+                                    if (btn) {
+                                        btn.classList.remove('collapsed');
+                                        btn.setAttribute('aria-expanded', 'true');
+                                    }
+                                    domainCard.classList.add('expanded');
+                                }
+                            });
+                        }
+                    }, 500); // 稍微延迟以确保DOM渲染
+                }
                 
                 // 处理聊天ID的显示
                 if (telegramConfig.chatIdFromEnv) {
@@ -2878,6 +3186,9 @@ const getHTMLContent = (title) => `
         
         // 保存设置
         async function saveSettings() {
+            const expandDomains = document.getElementById('expandDomainsEnabled').checked;
+            const progressStyle = document.querySelector('input[name="progressStyle"]:checked').value;
+            const cardLayout = document.querySelector('input[name="cardLayout"]:checked').value;
             const enabled = document.getElementById('telegramEnabled').checked;
             // 获取表单值，即使是空字符串也保留
             const botToken = document.getElementById('telegramToken').value;
@@ -2889,6 +3200,9 @@ const getHTMLContent = (title) => `
                     headers: { 'Content-Type': 'application/json' },
                     method: 'POST',
                     body: JSON.stringify({
+                        expandDomains,
+                        progressStyle,
+                        cardLayout,
                         enabled,
                         botToken,
                         chatId,
@@ -2908,6 +3222,16 @@ const getHTMLContent = (title) => `
                 
                 telegramConfig = await response.json();
                 showAlert('success', '设置保存成功');
+                
+                // 如果开启了默认展开，立即执行展开操作
+                if (telegramConfig.expandDomains) {
+                     viewMode = 'expand-all';
+                     // 模拟点击全部展开按钮
+                     const expandBtn = document.querySelector('.view-option[data-view="expand-all"]');
+                     if(expandBtn) expandBtn.click();
+                } else {
+                    // 如果关闭了，不需要强制折叠，保持当前状态即可，或者由用户决定
+                }
                 
                 // 关闭模态框
                 bootstrap.Modal.getInstance(document.getElementById('settingsModal')).hide();
@@ -2998,6 +3322,50 @@ const getHTMLContent = (title) => `
                 // 同步到全局变量
                 categories = categoryList;
             }
+            
+            // 更新分类筛选下拉框
+            const categoryFilter = document.getElementById('categoryFilter');
+            if (categoryFilter) {
+                // 保存当前选中的值
+                const currentVal = categoryFilter.value;
+                // 清空现有选项（保留第一个"所有分类"）
+                while (categoryFilter.options.length > 1) {
+                    categoryFilter.remove(1);
+                }
+                
+                // 按照order排序分类
+                const sortedCats = [...categories].sort((a, b) => a.order - b.order);
+                
+                // 添加选项
+                sortedCats.forEach(cat => {
+                    // 如果有域名在该分类下，才显示？或者显示所有分类？这里显示所有。
+                    // 也可以加上域名计数
+                    const count = domains.filter(d => (d.categoryId || 'default') === cat.id).length;
+                    const option = document.createElement('option');
+                    option.value = cat.id;
+                    option.textContent = cat.name + ' (' + count + ')';
+                    categoryFilter.appendChild(option);
+                });
+                
+                // 恢复选中值（如果该值还存在）
+                if (currentCategoryFilter && currentCategoryFilter !== 'all') {
+                    // 检查该值是否存在于新选项中
+                    let exists = false;
+                    for (let i = 0; i < categoryFilter.options.length; i++) {
+                        if (categoryFilter.options[i].value === currentCategoryFilter) {
+                            exists = true;
+                            break;
+                        }
+                    }
+                    if (exists) {
+                        categoryFilter.value = currentCategoryFilter;
+                    } else {
+                        // 如果之前选中的分类被删除了，重置为all
+                        currentCategoryFilter = 'all';
+                        categoryFilter.value = 'all';
+                    }
+                }
+            }
                 
                 // 按分类分组域名
     const domainGroups = {};
@@ -3065,16 +3433,26 @@ const getHTMLContent = (title) => `
                 domainsRow.className = 'row g-2';
                 groupContainer.appendChild(domainsRow);
                 
-                // 创建三列布局
-                const column1 = document.createElement('div');
-                const column2 = document.createElement('div');
-                const column3 = document.createElement('div');
-                column1.className = 'col-md-6 col-lg-4 domain-column px-1-5';
-                column2.className = 'col-md-6 col-lg-4 domain-column px-1-5';
-                column3.className = 'col-md-6 col-lg-4 domain-column px-1-5';
-                domainsRow.appendChild(column1);
-                domainsRow.appendChild(column2);
-                domainsRow.appendChild(column3);
+                // 根据配置决定列数
+                const cardLayout = telegramConfig.cardLayout || '4';
+                const numColumns = parseInt(cardLayout);
+                const columns = [];
+                
+                // 创建列
+                for (let i = 0; i < numColumns; i++) {
+                    const col = document.createElement('div');
+                    // 动态设置列宽类
+                    if (numColumns === 4) {
+                        // 4列模式：在大屏幕(lg)及以上占3份(1/4)，中屏幕(md)占6份(1/2)
+                        col.className = 'col-md-6 col-lg-3 domain-column px-1-5';
+                    } else {
+                        // 3列模式：在大屏幕(lg)及以上占4份(1/3)，中屏幕(md)占6份(1/2)
+                        col.className = 'col-md-6 col-lg-4 domain-column px-1-5';
+                    }
+                    col.id = 'column-' + (i+1); // 方便调试，虽然后面不一定用到ID
+                    domainsRow.appendChild(col);
+                    columns.push(col);
+                }
                 
                 // 如果分类下没有域名，显示提示信息
                 if (groupDomains.length === 0) {
@@ -3106,10 +3484,10 @@ const getHTMLContent = (title) => `
                         columnIndex = 0;
                     } else {
                         // PC端：按列分配，轮询分配到各列
-                        columnIndex = index % 3;
+                        columnIndex = index % numColumns;
                     }
                     
-                    const targetColumn = columnIndex === 0 ? column1 : (columnIndex === 1 ? column2 : column3);
+                    const targetColumn = columns[columnIndex];
                     // 创建卡片容器
                     const domainCard = document.createElement('div');
                     domainCard.className = 'mb-2'; // 简化类名，不再需要列类
@@ -3218,46 +3596,71 @@ const getHTMLContent = (title) => `
                         progressColor = 'rgba(0, 255, 76, 0.9)'; // 大于30%显示绿色
                     }
                     
-                    // 创建圆环进度条样式
-                    let progressCircleHtml = '';
+                    const progressStyle = telegramConfig.progressStyle || 'bar';
+                    let progressHtml = '';
+                    let textPaddingRight = '95px'; // 默认圆环模式下的右侧内边距
                     
-                    // 使用SVG实现圆环进度条
-                    const radius = 36; // 再次增加圆环半径
-                    const circumference = 2 * Math.PI * radius; // 圆环周长
-                    const offset = circumference - (progressPercent / 100) * circumference; // 计算偏移量
-                    
-                    // 创建SVG圆环进度条，增加SVG尺寸
-                    const svgSize = 85; // 再次增加SVG容器大小
-                    const svgCenter = svgSize / 2; // 居中
-                    
-                    // SVG圆环和百分比分开处理
-                    const percentText = progressPercent + '%';
-                    
-                    if (daysLeft <= 0) {
-                        // 已过期域名显示简化的进度条，但保留0%文本
-                        progressCircleHtml = 
-                            '<div style="position:relative; width:' + svgSize + 'px; height:' + svgSize + 'px;">' +
-                            '<svg class="progress-ring" width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 ' + svgSize + ' ' + svgSize + '">' +
-                            '<circle class="progress-ring-circle-bg" stroke="#f5f5f5" stroke-width="6" fill="transparent" r="' + radius + '" cx="' + svgCenter + '" cy="' + svgCenter + '"/>' +
-                            '</svg>' +
-                            '<div style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; z-index:9999;">' +
-                            '<span class="progress-percent-text">0%</span>' +
-                            '</div>' +
-                            '</div>';
+                    if (progressStyle === 'circle') {
+                        // 圆环模式逻辑
+                        let circleContent = '';
+                        // 使用SVG实现圆环进度条
+                        const radius = 36; // 再次增加圆环半径
+                        const circumference = 2 * Math.PI * radius; // 圆环周长
+                        const offset = circumference - (progressPercent / 100) * circumference; // 计算偏移量
+                        
+                        // 创建SVG圆环进度条，增加SVG尺寸
+                        const svgSize = 85; // 再次增加SVG容器大小
+                        const svgCenter = svgSize / 2; // 居中
+                        
+                        // SVG圆环和百分比分开处理
+                        const percentText = progressPercent + '%';
+                        
+                        if (daysLeft <= 0) {
+                            // 已过期域名显示简化的进度条，但保留0%文本
+                            circleContent = 
+                                '<div style="position:relative; width:' + svgSize + 'px; height:' + svgSize + 'px;">' +
+                                '<svg class="progress-ring" width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 ' + svgSize + ' ' + svgSize + '">' +
+                                '<circle class="progress-ring-circle-bg" stroke="#f5f5f5" stroke-width="6" fill="transparent" r="' + radius + '" cx="' + svgCenter + '" cy="' + svgCenter + '"/>' +
+                                '</svg>' +
+                                '<div style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; z-index:9999;">' +
+                                '<span class="progress-percent-text">0%</span>' +
+                                '</div>' +
+                                '</div>';
+                        } else {
+                            // 正常域名显示完整进度条
+                            circleContent = 
+                                '<div style="position:relative; width:' + svgSize + 'px; height:' + svgSize + 'px;">' +
+                                '<svg class="progress-ring" width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 ' + svgSize + ' ' + svgSize + '">' +
+                                '<circle class="progress-ring-circle-bg" stroke="#f5f5f5" stroke-width="6" fill="transparent" r="' + radius + '" cx="' + svgCenter + '" cy="' + svgCenter + '"/>' +
+                                '<circle class="progress-ring-circle" stroke="' + progressColor + '" stroke-width="6" fill="transparent" ' +
+                                'stroke-dasharray="' + circumference + ' ' + circumference + '" ' +
+                                'style="stroke-dashoffset:' + offset + 'px;" ' +
+                                'r="' + radius + '" cx="' + svgCenter + '" cy="' + svgCenter + '"/>' +
+                                '</svg>' +
+                                '<div style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; z-index:9999;">' +
+                                '<span class="progress-percent-text">' + percentText + '</span>' +
+                                '</div>' +
+                                '</div>';
+                        }
+                        
+                        progressHtml = '<div class="progress-circle-container"><div class="progress-circle">' + circleContent + '</div></div>';
                     } else {
-                        // 正常域名显示完整进度条
-                        progressCircleHtml = 
-                            '<div style="position:relative; width:' + svgSize + 'px; height:' + svgSize + 'px;">' +
-                            '<svg class="progress-ring" width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 ' + svgSize + ' ' + svgSize + '">' +
-                            '<circle class="progress-ring-circle-bg" stroke="#f5f5f5" stroke-width="6" fill="transparent" r="' + radius + '" cx="' + svgCenter + '" cy="' + svgCenter + '"/>' +
-                            '<circle class="progress-ring-circle" stroke="' + progressColor + '" stroke-width="6" fill="transparent" ' +
-                            'stroke-dasharray="' + circumference + ' ' + circumference + '" ' +
-                            'style="stroke-dashoffset:' + offset + 'px;" ' +
-                            'r="' + radius + '" cx="' + svgCenter + '" cy="' + svgCenter + '"/>' +
-                            '</svg>' +
-                            '<div style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; z-index:9999;">' +
-                            '<span class="progress-percent-text">' + percentText + '</span>' +
-                            '</div>' +
+                        // 进度条模式逻辑
+                        textPaddingRight = '0'; // 移除右侧内边距
+                        const percentText = (daysLeft <= 0 ? 0 : progressPercent) + '%';
+                        
+                        progressHtml = 
+                            '<div class="mt-2 mb-1" style="width: 100%;">' +
+                                '<div class="d-flex justify-content-between align-items-center mb-1">' +
+                                    '<small class="text-muted">有效期进度</small>' +
+                                    '<small class="fw-bold" style="color: var(--text-heading);">' + percentText + '</small>' +
+                                '</div>' +
+                                '<div class="progress" style="height: 8px; background-color: var(--count-badge-bg); border-radius: 4px; overflow: hidden;">' +
+                                    '<div class="progress-bar" role="progressbar" ' +
+                                        'style="width: ' + (daysLeft <= 0 ? 0 : progressPercent) + '%; background-color: ' + progressColor + '; transition: width 0.6s ease;" ' +
+                                        'aria-valuenow="' + (daysLeft <= 0 ? 0 : progressPercent) + '" aria-valuemin="0" aria-valuemax="100">' +
+                                    '</div>' +
+                                '</div>' +
                             '</div>';
                     }
                     
@@ -3268,22 +3671,22 @@ const getHTMLContent = (title) => `
                     if (notifySettings.enabled) {
                         const effectiveNotifyDays = notifySettings.useGlobalSettings ? globalNotifyDays : notifySettings.notifyDays;
                         const notifyLabel = notifySettings.useGlobalSettings ? '全局通知: ' : '自定义通知: ';
-                        infoHtml += '<small class="text-white d-inline-block me-3">' + 
+                        infoHtml += '<small class="text-muted d-inline-block me-3">' + 
                             notifyLabel + effectiveNotifyDays + '天' + 
                             '</small>';
                     } else {
-                        infoHtml += '<small class="text-white d-inline-block me-3">通知已禁用</small>';
+                        infoHtml += '<small class="text-muted d-inline-block me-3">通知已禁用</small>';
                     }
                     
                     // 添加上次续期信息
                     if (domain.lastRenewed) {
-                        infoHtml += '<small class="text-white d-inline-block">上次续期: ' + formatDate(domain.lastRenewed) + '</small>';
+                        infoHtml += '<small class="text-muted d-inline-block">上次续期: ' + formatDate(domain.lastRenewed) + '</small>';
                     }
                     
                     // 生成价格信息HTML
                     let priceHtml = '';
                     if (domain.price && domain.price.value !== null && domain.price.value !== undefined && domain.price.value !== '') {
-                        priceHtml = ' <span class="text-white-50">(' + domain.price.currency + domain.price.value + 
+                        priceHtml = ' <span class="text-muted">(' + domain.price.currency + domain.price.value + 
                         '/' + (domain.price.unit === 'year' ? '年' : domain.price.unit === 'month' ? '月' : '日') + 
                         ')</span>';
                     }
@@ -3331,8 +3734,9 @@ const getHTMLContent = (title) => `
                         '<div class="collapse" id="details-' + domain.id + '">' +
                         '<div class="card-body pb-2">' +
                         '<div class="d-flex justify-content-between align-items-start mb-2" style="position: relative;">' +
-                        '<div class="flex-grow-1" style="padding-right: 95px; min-width: 0;">' +
+                        '<div class="flex-grow-1" style="padding-right: ' + textPaddingRight + '; min-width: 0;">' +
                         (domain.registrar ? '<p class="card-text mb-1" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; display: block;"><i class="iconfont icon-house-chimney"></i><strong>注册厂商:</strong> ' + domain.registrar + '</p>' : '') +
+                        (domain.registeredAccount ? '<p class="card-text mb-1" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; display: block;"><i class="iconfont icon-user"></i><strong>注册账号:</strong> ' + domain.registeredAccount + '</p>' : '') +
                         (domain.registrationDate ? '<p class="card-text mb-1 text-nowrap" style="overflow: hidden; text-overflow: ellipsis;"><i class="iconfont icon-calendar-days"></i><strong>注册时间:</strong>' + formatDate(domain.registrationDate) + '</p>' : '') +
                         '<p class="card-text mb-1 text-nowrap" style="overflow: hidden; text-overflow: ellipsis;"><i class="iconfont icon-rili"></i><strong>到期日期:</strong>' + formatDate(domain.expiryDate) + '</p>' +
                         '<p class="card-text mb-1 text-nowrap" style="overflow: hidden; text-overflow: ellipsis;"><i class="iconfont icon-repeat"></i><strong>续期周期:</strong>' + 
@@ -3340,13 +3744,10 @@ const getHTMLContent = (title) => `
                         (domain.renewCycle.unit === 'year' ? '年' : 
                          domain.renewCycle.unit === 'month' ? '月' : '天') : '1 年') + 
                         priceHtml + '</p>' +
-                        '<p class="card-text mb-0 text-nowrap" style="overflow: hidden; text-overflow: ellipsis;"><i class="iconfont icon-hourglass-start"></i><strong>剩余天数:</strong>' + (daysLeft > 0 ? daysLeft + ' 天 <span class="text-white-50">(' + formatDaysToYMD(daysLeft) + ')</span>' : '已过期') + '</p>' +
+                        '<p class="card-text mb-0 text-nowrap" style="overflow: hidden; text-overflow: ellipsis;"><i class="iconfont icon-hourglass-start"></i><strong>剩余天数:</strong>' + (daysLeft > 0 ? daysLeft + ' 天 <span class="text-muted">(' + formatDaysToYMD(daysLeft) + ')</span>' : '已过期') + '</p>' +
+                        (progressStyle === 'bar' ? progressHtml : '') + 
                         '</div>' +
-                        '<div class="progress-circle-container">' +
-                        '<div class="progress-circle">' +
-                        progressCircleHtml +
-                        '</div>' +
-                        '</div>' +
+                        (progressStyle === 'circle' ? progressHtml : '') +
                         '</div>' +
                         (infoHtml ? '<div class="domain-info mb-2">' + infoHtml + '</div>' : '') +
                         '<div class="domain-actions">' +
@@ -3371,18 +3772,65 @@ const getHTMLContent = (title) => `
                 // 按分类顺序渲染域名分组
     const sortedCategories = Object.values(domainGroups).sort((a, b) => a.order - b.order);
     
+    // 过滤分类
+    let categoriesToRender = sortedCategories;
+    if (currentCategoryFilter !== 'all') {
+        categoriesToRender = sortedCategories.filter(cat => cat.id === currentCategoryFilter);
+    }
+    
     // 首先渲染默认分类（只有在有域名的情况下）
-    const defaultCategory = sortedCategories.find(cat => cat.isDefault);
+    const defaultCategory = categoriesToRender.find(cat => cat.isDefault);
     if (defaultCategory && defaultCategory.domains.length > 0) {
         renderGroup(defaultCategory);
     }
     
     // 然后渲染其他分类（包括空分类）
-    sortedCategories.forEach(category => {
+    categoriesToRender.forEach(category => {
         if (!category.isDefault) {
             renderGroup(category);
         }
     });
+
+    // 恢复视图状态（如果需要展开）
+    if (viewMode === 'expand-all' || (telegramConfig.expandDomains && viewMode !== 'collapse-all')) {
+        // 确保视图模式设置为展开
+        if (viewMode !== 'expand-all') {
+            viewMode = 'expand-all';
+             // 更新按钮状态
+            const expandBtn = document.querySelector('.view-option[data-view="expand-all"]');
+            if (expandBtn) {
+                document.querySelectorAll('.view-option').forEach(btn => {
+                    if (btn.dataset.view === 'expand-all') {
+                        btn.classList.remove('btn-outline-info');
+                        btn.classList.add('btn-info');
+                    } else {
+                        btn.classList.add('btn-outline-info');
+                        btn.classList.remove('btn-info');
+                    }
+                });
+            }
+        }
+
+        // 展开所有卡片
+        setTimeout(() => {
+            const allDetails = document.querySelectorAll('.domain-card .collapse');
+            allDetails.forEach(detail => {
+                detail.classList.add('show');
+                detail.style.height = 'auto';
+                detail.style.overflow = 'visible';
+                
+                const domainCard = detail.closest('.domain-card');
+                if (domainCard) {
+                    const btn = domainCard.querySelector('.toggle-details');
+                    if (btn) {
+                        btn.classList.remove('collapsed');
+                        btn.setAttribute('aria-expanded', 'true');
+                    }
+                    domainCard.classList.add('expanded');
+                }
+            });
+        }, 50);
+    }
             
             // 添加事件监听器
             document.querySelectorAll('.edit-domain').forEach(button => {
@@ -3495,6 +3943,7 @@ const getHTMLContent = (title) => `
             const expiryDate = document.getElementById('expiryDate').value;
             const registrationDate = document.getElementById('registrationDate').value;
             const registrar = document.getElementById('registrar').value;
+            const registeredAccount = document.getElementById('registeredAccount').value;
             const categoryId = document.getElementById('domainCategory').value || 'default';
             const customNote = document.getElementById('customNote').value;
             const noteColor = document.getElementById('noteColor').value;
@@ -3541,6 +3990,7 @@ const getHTMLContent = (title) => `
                 expiryDate,
                 registrationDate,
                 registrar,
+                registeredAccount,
                 categoryId,
                 customNote,
                 noteColor,
@@ -3579,6 +4029,7 @@ const getHTMLContent = (title) => `
                         bootstrap.Modal.getInstance(document.getElementById('addDomainModal')).hide();
                         resetForm();
                         await loadDomains();
+                        renderDomainList();
                         showAlert('success', domainId ? '域名更新成功' : '域名添加成功');
                     } catch (error) {
                         showAlert('danger', '保存域名失败: ' + error.message);
@@ -3630,6 +4081,7 @@ const getHTMLContent = (title) => `
                     document.getElementById('expiryDate').value = domain.expiryDate;
                     document.getElementById('registrationDate').value = domain.registrationDate !== undefined ? domain.registrationDate : '';
                     document.getElementById('registrar').value = domain.registrar !== undefined ? domain.registrar : '';
+                    document.getElementById('registeredAccount').value = domain.registeredAccount !== undefined ? domain.registeredAccount : '';
                     // 设置分类选择
                     updateCategorySelect(categories, domain.categoryId || 'default');
                     document.getElementById('customNote').value = domain.customNote !== undefined ? domain.customNote : '';
@@ -3727,6 +4179,7 @@ const getHTMLContent = (title) => `
                         bootstrap.Modal.getInstance(document.getElementById('deleteDomainModal')).hide();
                         currentDomainId = null;
                         await loadDomains();
+                        renderDomainList();
                         showAlert('success', '域名删除成功');
                     } catch (error) {
                         showAlert('danger', '删除域名失败: ' + error.message);
@@ -3808,6 +4261,7 @@ const getHTMLContent = (title) => `
                         bootstrap.Modal.getInstance(document.getElementById('renewDomainModal')).hide();
                         currentDomainId = null;
                         await loadDomains();
+                        renderDomainList();
                         showAlert('success', '域名续期成功');
                     } catch (error) {
                         showAlert('danger', '域名续期失败: ' + error.message);
@@ -3821,6 +4275,7 @@ const getHTMLContent = (title) => `
                     document.getElementById('expiryDate').value = '';
                     document.getElementById('registrationDate').value = '';
                     document.getElementById('registrar').value = '';
+                    document.getElementById('registeredAccount').value = '';
                     document.getElementById('customNote').value = '';
                     document.getElementById('noteColor').value = 'tag-blue'; // 重置为默认蓝色
                     document.getElementById('renewLink').value = '';
@@ -3957,8 +4412,8 @@ const getHTMLContent = (title) => `
                         categoryItem.innerHTML = 
                             '<div class="d-flex justify-content-between align-items-start">' +
                                 '<div class="flex-grow-1">' +
-                                    '<h6 class="mb-1 fw-bold text-white">' + category.name + '</h6>' +
-                                    '<small class="text-light opacity-75">' + (category.description || '无描述') + '</small>' +
+                                    '<h6 class="mb-1 fw-bold text-heading">' + category.name + '</h6>' +
+                                    '<small class="text-muted opacity-75">' + (category.description || '无描述') + '</small>' +
                                 '</div>' +
                                 '<div class="d-flex gap-2 ms-3">' +
                                     '<button type="button" class="btn btn-outline-light move-category-up" data-id="' + category.id + '" ' + (index === 0 ? 'disabled' : '') + ' title="上移" style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 6px; line-height: 1;">' +
@@ -4053,6 +4508,7 @@ const getHTMLContent = (title) => `
                         // 重新加载分类列表和域名列表
                         await loadCategories();
                         await loadDomains(); // 刷新域名列表以更新分类选择框
+                        renderDomainList();
                         showAlert('success', '分类添加成功');
                     } catch (error) {
                         showAlert('danger', error.message);
@@ -4083,11 +4539,11 @@ const getHTMLContent = (title) => `
                     targetItem.innerHTML = 
                         '<div class="p-3 rounded" style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);">' +
                             '<div class="mb-3">' +
-                                '<label class="form-label text-white small">分类名称</label>' +
+                                '<label class="form-label text-heading small">分类名称</label>' +
                                 '<input type="text" class="form-control form-control-sm" id="editName_' + categoryId + '" value="' + category.name.replace(/"/g, '&quot;') + '" maxlength="50">' +
                             '</div>' +
                             '<div class="mb-3">' +
-                                '<label class="form-label text-white small">描述</label>' +
+                                '<label class="form-label text-heading small">描述</label>' +
                                 '<input type="text" class="form-control form-control-sm" id="editDesc_' + categoryId + '" value="' + (category.description || '').replace(/"/g, '&quot;') + '" maxlength="100">' +
                             '</div>' +
                             '<div class="d-flex gap-2">' +
@@ -4143,6 +4599,7 @@ const getHTMLContent = (title) => `
                         
                         await loadCategories();
                         await loadDomains(); // 同时刷新域名列表，因为分类名称变化会影响显示
+                        renderDomainList();
                         showAlert('success', '分类更新成功');
                     } catch (error) {
                         showAlert('danger', error.message);
@@ -4187,6 +4644,7 @@ const getHTMLContent = (title) => `
                         
                         await loadCategories();
                         await loadDomains(); // 重新加载域名以更新显示
+                        renderDomainList();
                         showAlert('success', '分类删除成功');
                     } catch (error) {
                         showAlert('danger', error.message);
@@ -4209,6 +4667,7 @@ const getHTMLContent = (title) => `
                         
                         await loadCategories();
                         await loadDomains(); // 同时刷新域名列表，因为分类顺序变化会影响显示
+                        renderDomainList();
                         showAlert('success', '分类顺序更新成功');
                     } catch (error) {
                         showAlert('danger', error.message);
@@ -4298,15 +4757,40 @@ const getHTMLContent = (title) => `
                     document.getElementById('expiryDate').classList.remove('auto-filled');
                     document.getElementById('renewCycleValue').classList.remove('auto-filled');
                     document.getElementById('renewCycleUnit').classList.remove('auto-filled');
+                    document.getElementById('renewLink').classList.remove('auto-filled');
                     
+                    const domainName = document.getElementById('domainName').value.toLowerCase();
+
                     // 填充注册商
-                    if (whoisData.registrar) {
+                    let registrarName = whoisData.registrar;
+                    // 针对特定域名强制设置注册商名称
+                    if (domainName.endsWith('.pp.ua')) {
+                        registrarName = 'NIC.UA';
+                    } else if (domainName.endsWith('.qzz.io') || domainName.endsWith('.dpdns.org') || domainName.endsWith('.us.kg') || domainName.endsWith('.xx.kg')) {
+                        registrarName = 'DigitalPlat.org';
+                    }
+
+                    if (registrarName) {
                         const registrarField = document.getElementById('registrar');
-                        registrarField.value = whoisData.registrar;
+                        registrarField.value = registrarName;
                         registrarField.classList.add('auto-filled');
                         filledFields.push('注册商');
                     } else {
                         missingFields.push('注册商');
+                    }
+                    
+                    // 自动填充续费链接
+                    const renewLinkField = document.getElementById('renewLink');
+                    if (!renewLinkField.value) {
+                        if (domainName.endsWith('.pp.ua')) {
+                            renewLinkField.value = 'https://nic.ua/en/my/domains';
+                            renewLinkField.classList.add('auto-filled');
+                            filledFields.push('续费链接');
+                        } else if (domainName.endsWith('.qzz.io') || domainName.endsWith('.dpdns.org') || domainName.endsWith('.us.kg') || domainName.endsWith('.xx.kg')) {
+                            renewLinkField.value = 'https://dash.domain.digitalplat.org/panel/main?page=%2Fpanel%2Fdomains';
+                            renewLinkField.classList.add('auto-filled');
+                            filledFields.push('续费链接');
+                        }
                     }
                     
                     // 填充注册日期
@@ -4365,25 +4849,11 @@ const getHTMLContent = (title) => `
                         const daysDiff = Math.round(timeDiff / (1000 * 60 * 60 * 24));
                         
                         // 根据天数推算续期周期
-                        if (daysDiff >= 360 && daysDiff <= 370) {
-                            // 1年 (365天左右，考虑闰年)
+                        // 修改逻辑：只要大于等于360天（约1年），就默认认为是1年周期（可能是续费了多次）
+                        // 除非明确是小于1年的短期域名
+                        if (daysDiff >= 360) {
+                            // 1年及以上，默认为1年周期
                             document.getElementById('renewCycleValue').value = '1';
-                            document.getElementById('renewCycleUnit').value = 'year';
-                        } else if (daysDiff >= 720 && daysDiff <= 740) {
-                            // 2年
-                            document.getElementById('renewCycleValue').value = '2';
-                            document.getElementById('renewCycleUnit').value = 'year';
-                        } else if (daysDiff >= 1080 && daysDiff <= 1110) {
-                            // 3年
-                            document.getElementById('renewCycleValue').value = '3';
-                            document.getElementById('renewCycleUnit').value = 'year';
-                        } else if (daysDiff >= 1800 && daysDiff <= 1830) {
-                            // 5年
-                            document.getElementById('renewCycleValue').value = '5';
-                            document.getElementById('renewCycleUnit').value = 'year';
-                        } else if (daysDiff >= 3600 && daysDiff <= 3670) {
-                            // 10年
-                            document.getElementById('renewCycleValue').value = '10';
                             document.getElementById('renewCycleUnit').value = 'year';
                         } else if (daysDiff >= 28 && daysDiff <= 31) {
                             // 1个月
@@ -4398,16 +4868,15 @@ const getHTMLContent = (title) => `
                             document.getElementById('renewCycleValue').value = '6';
                             document.getElementById('renewCycleUnit').value = 'month';
                         } else {
-                            // 其他情况，计算最接近的年数
-                            const years = Math.round(daysDiff / 365);
-                            if (years >= 1) {
-                                document.getElementById('renewCycleValue').value = years.toString();
-                                document.getElementById('renewCycleUnit').value = 'year';
-                            } else {
-                                // 小于1年的情况，按月计算
-                                const months = Math.round(daysDiff / 30);
-                                document.getElementById('renewCycleValue').value = Math.max(1, months).toString();
+                             // 其他小于1年的情况，默认按月计算，如果连一个月都不到则按1年处理
+                            const months = Math.round(daysDiff / 30);
+                            if (months >= 1) {
+                                document.getElementById('renewCycleValue').value = months.toString();
                                 document.getElementById('renewCycleUnit').value = 'month';
+                            } else {
+                                // 默认 fallback
+                                document.getElementById('renewCycleValue').value = '1';
+                                document.getElementById('renewCycleUnit').value = 'year';
                             }
                         }
                     } catch (error) {
@@ -4857,12 +5326,16 @@ async function handleApiRequest(request) {
       // 验证域名格式
       const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/;
       if (!domainRegex.test(domain)) {
-        return jsonResponse({ error: '仅支持自动查询一级域名' }, 400);
+        return jsonResponse({ error: '域名格式不正确' }, 400);
       }
       
-      // 验证是否为一级域名（只能有一个点）
+      // 验证是否为一级域名（只能有一个点），pp.ua及DigitalPlat特定域名除外
       const dotCount = domain.split('.').length - 1;
-      if (dotCount !== 1) {
+      const lowerDomain = domain.toLowerCase();
+      const isPpUa = lowerDomain.endsWith('.pp.ua');
+      const isDigitalPlat = lowerDomain.endsWith('.qzz.io') || lowerDomain.endsWith('.dpdns.org') || lowerDomain.endsWith('.us.kg') || lowerDomain.endsWith('.xx.kg');
+      
+      if (dotCount !== 1 && !((isPpUa || isDigitalPlat) && dotCount === 2)) {
         if (dotCount === 0) {
           return jsonResponse({ error: '请输入完整的域名（如：example.com）' }, 400);
         } else {
@@ -4870,7 +5343,18 @@ async function handleApiRequest(request) {
         }
       }
       
-      const result = await queryDomainWhois(domain);
+      let result;
+      if (isPpUa) {
+        // 使用专门的 nic.ua 接口查询 pp.ua 域名
+        result = await queryPpUaWhois(domain);
+      } else if (isDigitalPlat) {
+        // 使用 DigitalPlat 接口查询特定二级域名
+        result = await queryDigitalPlatWhois(domain);
+      } else {
+        // 其他域名使用 WhoisJSON API
+        result = await queryDomainWhois(domain);
+      }
+      
       return jsonResponse(result);
     } catch (error) {
       return jsonResponse({ error: 'WHOIS查询失败: ' + error.message }, 400);
@@ -5069,6 +5553,7 @@ async function updateDomain(id, domainData) {
     expiryDate: domainData.expiryDate,
     registrationDate: domainData.registrationDate !== undefined ? domainData.registrationDate : domains[index].registrationDate,
     registrar: domainData.registrar !== undefined ? domainData.registrar : domains[index].registrar,
+    registeredAccount: domainData.registeredAccount !== undefined ? domainData.registeredAccount : domains[index].registeredAccount,
     categoryId: domainData.categoryId !== undefined ? domainData.categoryId : domains[index].categoryId, // 添加分类ID处理
     customNote: domainData.customNote !== undefined ? domainData.customNote : domains[index].customNote, // 正确处理空字符串
     noteColor: domainData.noteColor !== undefined ? domainData.noteColor : domains[index].noteColor, // 添加备注颜色处理
@@ -5189,6 +5674,9 @@ async function getTelegramConfig() {
     tokenFromEnv: tokenFromEnv || tokenFromCode, // 环境变量或代码中有设置都显示为已配置
     hasToken: tokenFromEnv || tokenFromCode || (config.botToken !== undefined && config.botToken !== null && config.botToken !== ''),
     notifyDays: config.notifyDays || 30,
+    expandDomains: !!config.expandDomains, // 返回域名展开配置
+    progressStyle: config.progressStyle || 'bar', // 返回进度样式配置
+    cardLayout: config.cardLayout || '4', // 返回卡片布局配置
   };
 }
 
@@ -5219,6 +5707,9 @@ async function saveTelegramConfig(configData) {
     botToken: configData.botToken, // 可能为空字符串，表示用户清除了值
     chatId: configData.chatId, // 可能为空字符串，表示用户清除了值
     notifyDays: configData.notifyDays || 30,
+    expandDomains: !!configData.expandDomains, // 保存域名展开配置
+    progressStyle: configData.progressStyle || 'bar', // 保存进度样式配置
+    cardLayout: configData.cardLayout || '4', // 保存卡片布局配置
   };
   
   await DOMAIN_MONITOR.put('telegram_config', JSON.stringify(config));
@@ -5259,6 +5750,9 @@ async function saveTelegramConfig(configData) {
     tokenFromEnv: tokenFromEnv || tokenFromCode, // 环境变量或代码中有设置都显示为已配置
     hasToken: tokenFromEnv || tokenFromCode || !!config.botToken,
     notifyDays: config.notifyDays,
+    expandDomains: config.expandDomains, // 返回域名展开配置
+    progressStyle: config.progressStyle, // 返回进度样式配置
+    cardLayout: config.cardLayout, // 返回卡片布局配置
   };
 }
 
@@ -5834,7 +6328,7 @@ function addCopyrightFooter(html) {
   // 页脚图标颜色（使用CSS颜色值，如：#4e54c8、blue、rgba(0,0,0,0.7)等）
   const footerIconColor = 'white';
   
-  const footerContent = `<span style="color: white;">Copyright © 2025 Faiz</span> &nbsp;|&nbsp; <i class="iconfont icon-github" style="font-size: ${footerIconSize}; color: ${footerIconColor};"></i><a href="https://github.com/kamanfaiz/CF-Domain-Autocheck" target="_blank" style="color: white; text-decoration: none;">GitHub Repository</a> &nbsp;|&nbsp; <i class="iconfont icon-book" style="font-size: ${footerIconSize}; color: ${footerIconColor};"></i><a href="https://blog.faiz.hidns.co/" target="_blank" style="color: white; text-decoration: none;">Faiz博客</a>`;
+  const footerContent = `<span style="color: var(--text-muted);">Copyright © 2025</span> &nbsp;|&nbsp; <i class="iconfont icon-github" style="font-size: ${footerIconSize}; color: var(--text-muted);"></i><a href="https://github.com/jy02739244/CF-Domain-Autocheck" target="_blank" style="color: var(--text-main); text-decoration: none;">GitHub Repository</a> &nbsp;`;
   
   const bodyEndIndex = html.lastIndexOf('</body>');
   
@@ -5859,13 +6353,13 @@ function addCopyrightFooter(html) {
           text-align: center;
           padding: 10px;
           font-size: ${footerFontSize};
-          border-top: 1px solid rgba(255, 255, 255, 0.18);
+          border-top: 1px solid var(--border-glass);
           margin-top: auto;
-          background-color: rgba(0, 0, 0, 0.2);
+          background-color: var(--bg-glass);
           backdrop-filter: blur(5px);
           -webkit-backdrop-filter: blur(5px);
-          color: white;
-          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+          color: var(--text-muted);
+          text-shadow: none;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -5934,7 +6428,7 @@ function addCopyrightFooter(html) {
   
   // 如果没找到</body>标签，就直接添加到HTML末尾
   const footerHtml = `
-    <div style="text-align: center; padding: 10px; font-size: ${footerFontSize}; margin-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.18); background-color: rgba(0, 0, 0, 0.2); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); color: white; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+    <div style="text-align: center; padding: 10px; font-size: ${footerFontSize}; margin-top: 20px; border-top: 1px solid var(--border-glass); background-color: var(--bg-glass); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
       ${footerContent}
     </div>
   `;
