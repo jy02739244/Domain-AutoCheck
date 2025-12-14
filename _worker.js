@@ -13,9 +13,9 @@ const ICONFONT_CSS = '//at.alicdn.com/t/c/font_4973034_1qunj5fctpb.css';
 const ICONFONT_JS = '//at.alicdn.com/t/c/font_4973034_1qunj5fctpb.js';
 
 // 网站图标和背景图片
-const DEFAULT_LOGO = 'https://cdn.jsdelivr.net/gh/jy02739244/CF-Domain-AutoCheck@main/img/logo.png'; // 默认logo，外置变量为LOGO_URL
-const DEFAULT_BACKGROUND = 'https://cdn.jsdelivr.net/gh/jy02739244/CF-Domain-AutoCheck@main/img/background.png'; // 默认背景，外置变量为BACKGROUND_URL
-const DEFAULT_MOBILE_BACKGROUND = 'https://cdn.jsdelivr.net/gh/jy02739244/CF-Domain-AutoCheck@main/img/mobile2.png'; // 默认移动端背景，外置变量为MOBILE_BACKGROUND_URL
+const DEFAULT_LOGO = 'https://cdn.jsdelivr.net/gh/jy02739244/Domain-AutoCheck@main/img/logo.png'; // 默认logo，外置变量为LOGO_URL
+const DEFAULT_BACKGROUND = 'https://cdn.jsdelivr.net/gh/jy02739244/Domain-AutoCheck@main/img/background.png'; // 默认背景，外置变量为BACKGROUND_URL
+const DEFAULT_MOBILE_BACKGROUND = 'https://cdn.jsdelivr.net/gh/jy02739244/Domain-AutoCheck@main/img/mobile.webp'; // 默认移动端背景，外置变量为MOBILE_BACKGROUND_URL
 
 // 登录密码设置
 const DEFAULT_TOKEN = ''; // 默认密码，留空则使用'domain'，外置变量为TOKEN
@@ -425,7 +425,7 @@ const getLoginHTML = (title) => `
     </style>
 </head>
 <body>
-    <a href="https://github.com/jy02739244/CF-Domain-Autocheck" target="_blank" class="github-corner" title="GitHub Repository">
+    <a href="https://slink.661388.xyz/domain-autocheck" target="_blank" class="github-corner" title="GitHub Repository">
         <i class="iconfont icon-github1"></i>
     </a>
     <div class="login-container">
@@ -1358,7 +1358,7 @@ const getHTMLContent = (title) => `
         
         /* 视图按钮样式 */
         .view-option {
-            color: rgb(223, 223, 223) !important; /* 未选状态使用灰色文字 */
+            color: rgb(80, 80, 80) !important; /* 修改：加深文字颜色，修复亮色主题下看不清的问题 */
             background-color: rgba(204, 204, 204, 0.8) !important; /* 未选状态的背景色 */
             border-color:rgba(109, 109, 109, 0.3) !important; /* 修改边框颜色 */
         }
@@ -3753,7 +3753,6 @@ const getHTMLContent = (title) => `
                         '<div class="domain-actions">' +
                         '<button class="btn btn-sm btn-primary edit-domain" data-id="' + domain.id + '" title="编辑域名"><i class="iconfont icon-pencil"></i> 编辑</button>' +
                         '<button class="btn btn-sm btn-success renew-domain" data-id="' + domain.id + '" data-name="' + domain.name + '" data-expiry="' + domain.expiryDate + '" title="续期域名"><i class="iconfont icon-arrows-rotate"></i> 续期</button>' +
-                        '<button class="btn btn-sm btn-info test-domain-notify" data-id="' + domain.id + '" title="测试通知"><i class="iconfont icon-paper-plane"></i> 测试</button>' +
                         (domain.renewLink ? 
                         '<a href="' + domain.renewLink + '" target="_blank" class="btn btn-sm btn-warning" title="前往续期页面"><i class="iconfont icon-link"></i> 链接</a>' : 
                         '<button class="btn btn-sm btn-secondary" disabled title="未设置续期链接"><i class="iconfont icon-link"></i> 链接</button>') +
@@ -3853,10 +3852,6 @@ const getHTMLContent = (title) => `
                 button.addEventListener('click', () => showRenewModal(button.dataset.id, button.dataset.name, button.dataset.expiry));
             });
             
-            // 添加测试通知按钮的事件监听器
-            document.querySelectorAll('.test-domain-notify').forEach(button => {
-                button.addEventListener('click', () => testDomainNotification(button.dataset.id));
-            });
             
             // 添加下拉按钮的事件监听器
             document.querySelectorAll('.toggle-details').forEach(button => {
@@ -4717,6 +4712,11 @@ const getHTMLContent = (title) => `
                         }
                         
                         if (result.success) {
+                            //新增：检查域名是否已注册
+                            if (result.registered === false) {
+                                showWhoisStatus('域名不存在或未注册', 'danger');
+                                return; // 直接结束，不填充表单
+                            }
                             // 查询成功，填充表单数据
                             const fillResult = fillFormWithWhoisData(result);
                             if (fillResult) {
@@ -4925,25 +4925,6 @@ const getHTMLContent = (title) => `
                 }
                 
 
-
-                // 添加测试单个域名通知的函数
-                async function testDomainNotification(domainId) {
-                    try {
-                        const response = await fetch('/api/domains/' + domainId + '/test-notify', {
-                            method: 'POST'
-                        });
-                        
-                        if (!response.ok) {
-                            const error = await response.json();
-                            throw new Error(error.error || '测试失败');
-                        }
-                        
-                        const result = await response.json();
-                        showAlert('success', '通知测试成功！请检查Telegram是否收到消息');
-                    } catch (error) {
-                        showAlert('danger', '测试通知失败: ' + error.message);
-                    }
-                }
 
                 // 按照指定字段和顺序排序域名
                 function sortDomains(domains, field, order) {
@@ -5244,16 +5225,6 @@ async function handleApiRequest(request) {
     }
   }
 
-  // 测试单个域名的通知
-  if (path.match(/^\/api\/domains\/[^\/]+\/test-notify$/) && request.method === 'POST') {
-    const id = path.split('/')[3];
-    try {
-      const result = await testSingleDomainNotification(id);
-      return jsonResponse(result);
-    } catch (error) {
-      return jsonResponse({ error: '测试通知失败: ' + error.message }, 400);
-    }
-  }
   
   // ================================
   // 分类管理API
@@ -5756,7 +5727,7 @@ async function saveTelegramConfig(configData) {
   };
 }
 
-// 测试Telegram通知
+// 测试Telegram通知 (修改版：模拟域名到期格式)
 async function testTelegramNotification() {
   const config = await getTelegramConfigWithToken();
   
@@ -5772,7 +5743,28 @@ async function testTelegramNotification() {
     throw new Error('未配置Telegram聊天ID');
   }
   
-  const message = '这是一条来自域名监控系统的测试通知，如果您收到此消息，表示Telegram通知配置成功！';
+  // === 构造模拟数据 ===
+  // 1. 计算到期日期 (今天 + 90天)
+  const today = new Date();
+  const targetDate = new Date(today);
+  targetDate.setDate(today.getDate() + 90);
+  // 格式化日期 YYYY-MM-DD
+  const year = targetDate.getFullYear();
+  const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+  const day = String(targetDate.getDate()).padStart(2, '0');
+  const formattedDate = `${year}-${month}-${day}`;
+
+  // 2. 构造消息内容 (使用卡片通知的样式)
+  const title = '🚨 <b>域名到期测试通知</b> 🚨';
+  const separator = '=======================';
+  
+  let message = title + '\n' + separator + '\n\n';
+  
+  message += '🌍 <b>域名:</b> xx.pp.ua\n';
+  message += '🏬 <b>注册厂商:</b> NIC.UA\n';
+  message += '⏳ <b>剩余时间:</b> 90 天\n';
+  message += '📅 <b>到期日期:</b> ' + formattedDate + '\n';
+  message += '⚠️ <b>点击续期:</b> https://nic.ua/en/my/domains\n';
   
   const result = await sendTelegramMessage(config, message);
   return { success: true, message: '测试通知已发送' };
@@ -6147,6 +6139,10 @@ async function sendExpiringDomainsNotification(config, domains, isExpired) {
     if (domain.registrar) {
       message += '🏬 <b>注册厂商:</b> ' + domain.registrar + '\n';
     }
+    if (domain.registeredAccount) {
+      message += '👤 <b>注册账号:</b> ' + domain.registeredAccount + '\n';
+    }
+
     message += '⏳ <b>剩余时间:</b> ' + daysLeft + ' 天\n';
     message += '📅 <b>到期日期:</b> ' + formatDate(domain.expiryDate) + '\n';
     
@@ -6187,6 +6183,9 @@ async function sendCombinedDomainsNotification(config, expiringDomains, expiredD
       if (domain.registrar) {
         message += '🏬 注册厂商: ' + domain.registrar + '\n';
       }
+      if (domain.registeredAccount) {
+        message += '👤 注册账号: ' + domain.registeredAccount + '\n';
+    }
       message += '⏳ 剩余时间: ' + daysLeft + ' 天\n';
       message += '📅 到期日期: ' + formatDate(domain.expiryDate) + '\n';
       
@@ -6223,6 +6222,9 @@ async function sendCombinedDomainsNotification(config, expiringDomains, expiredD
       if (domain.registrar) {
         message += '🏬 注册厂商: ' + domain.registrar + '\n';
       }
+      if (domain.registeredAccount) {
+        message += '👤 注册账号: ' + domain.registeredAccount + '\n';
+      }
       message += '⏳ 剩余时间: ' + daysLeft + ' 天\n';
       message += '📅 到期日期: ' + formatDate(domain.expiryDate) + '\n';
       
@@ -6238,67 +6240,7 @@ async function sendCombinedDomainsNotification(config, expiringDomains, expiredD
   return await sendTelegramMessage(config, message);
 }
 
-// 添加测试单个域名通知的后端函数
-async function testSingleDomainNotification(id) {
-  // 获取域名信息
-  const domains = await getDomains();
-  const domain = domains.find(d => d.id === id);
-  
-  if (!domain) {
-    throw new Error('域名不存在');
-  }
-  
-  // 获取Telegram配置
-  const telegramConfig = await getTelegramConfigWithToken();
-  
-  if (!telegramConfig.enabled) {
-    throw new Error('Telegram通知未启用');
-  }
-  
-  if (!telegramConfig.botToken && typeof TG_TOKEN === 'undefined') {
-    throw new Error('未配置Telegram机器人Token');
-  }
-  
-  if (!telegramConfig.chatId && typeof TG_ID === 'undefined') {
-    throw new Error('未配置Telegram聊天ID');
-  }
-  
-  // 构建测试消息
-  const expiryDate = new Date(domain.expiryDate);
-  const today = new Date();
-  const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
-  const isExpired = daysLeft <= 0;
-  
-  let title = isExpired ? 
-    '🚫 <b>域名已过期测试通知</b> 🚫' : 
-    '🚨 <b>域名到期测试通知</b> 🚨';
-  
-  // 根据不同通知类型使用不同长度的分隔线
-  // 域名到期测试通知使用23个字符，域名已过期测试通知使用25个字符
-  const separator = isExpired ? 
-    '=========================' : 
-        '=======================';
-  
-  let message = title + '\n' + separator + '\n\n';
-  message += '这是一条测试通知，用于预览域名' + (isExpired ? '已过期' : '到期') + '提醒的格式：\n\n';
 
-  message += '🌍 <b>域名:</b> ' + domain.name + '\n';
-  if (domain.registrar) {
-    message += '🏬 <b>注册厂商:</b> ' + domain.registrar + '\n';
-  }
-  message += '⏳ <b>剩余时间:</b> ' + daysLeft + ' 天\n';
-  message += '📅 <b>到期日期:</b> ' + formatDate(domain.expiryDate) + '\n';
-  
-  if (domain.renewLink) {
-    message += '⚠️ <b>点击续期:</b> ' + domain.renewLink + '\n';
-  } else {
-    message += '⚠️ <b>点击续期:</b> 未设置续期链接\n';
-  }
-  
-  // 发送测试消息
-  const result = await sendTelegramMessage(telegramConfig, message);
-  return { success: true, message: '测试通知已发送' };
-}
 
 // ================================
 // Cloudflare Workers事件处理
@@ -6328,7 +6270,7 @@ function addCopyrightFooter(html) {
   // 页脚图标颜色（使用CSS颜色值，如：#4e54c8、blue、rgba(0,0,0,0.7)等）
   const footerIconColor = 'white';
   
-  const footerContent = `<span style="color: var(--text-muted);">Copyright © 2025</span> &nbsp;|&nbsp; <i class="iconfont icon-github" style="font-size: ${footerIconSize}; color: var(--text-muted);"></i><a href="https://github.com/jy02739244/CF-Domain-Autocheck" target="_blank" style="color: var(--text-main); text-decoration: none;">GitHub Repository</a> &nbsp;`;
+  const footerContent = `<span style="color: var(--text-muted);">Copyright © 2025</span> &nbsp;|&nbsp; <i class="iconfont icon-github" style="font-size: ${footerIconSize}; color: var(--text-muted);"></i><a href="https://slink.661388.xyz/domain-autocheck" target="_blank" style="color: var(--text-main); text-decoration: none;">GitHub Repository</a> &nbsp;`;
   
   const bodyEndIndex = html.lastIndexOf('</body>');
   
