@@ -179,7 +179,6 @@ async function queryDigitalPlatWhois(domain) {
         'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
       }
     });
-
     if (!response.ok) {
       throw new Error(`DigitalPlat API请求失败: ${response.status} ${response.statusText}`);
     }
@@ -707,6 +706,8 @@ const getHTMLContent = (title) => `
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
             margin-bottom: 20px;
             padding: 16px 24px;
             background-color: var(--bg-glass);
@@ -741,6 +742,12 @@ const getHTMLContent = (title) => `
             align-items: center;
             gap: 10px;
             margin-left: auto;
+            flex-wrap: wrap;
+        }
+
+        .category-dropdown-wrapper {
+            min-width: 100px;
+            flex-shrink: 1;
         }
         
         /* 按钮通用样式微调 */
@@ -1882,10 +1889,30 @@ const getHTMLContent = (title) => `
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
         
-        @media (max-width: 768px) {
-            .domain-card {
+        @media (max-width: 992px) {
+            .page-header {
                 flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
             }
+
+            .header-title-group {
+                width: 100%;
+                justify-content: space-between;
+                flex-wrap: nowrap;
+                margin-bottom: 10px;
+            }
+
+            .btn-action-group {
+                width: 100%;
+                display: flex;
+                justify-content: flex-end; /* Align buttons to the right, or space-between if preferred */
+                flex-wrap: wrap;
+                gap: 5px;
+            }
+        }
+        
+        @media (max-width: 768px) {
             
             .domain-card .card-header {
                 width: 100%;
@@ -1914,18 +1941,6 @@ const getHTMLContent = (title) => `
             .domain-actions .iconfont {
                 margin-right: 1px;
                 font-size: 0.75rem;
-            }
-            
-            .page-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 10px;
-            }
-            
-            .btn-action-group {
-                width: 100%;
-                display: flex;
-                justify-content: flex-end;
             }
             
             /* 移动端导航栏按钮只显示图标，隐藏文字 */
@@ -2016,13 +2031,15 @@ const getHTMLContent = (title) => `
         
         <!-- 页面标题和操作按钮 -->
         <div class="page-header">
-            <h1 class="page-title"><i class="iconfont icon-list-ul"></i> 域名列表 <span class="count-badge" id="totalDomainCount">(0)</span></h1>
-            <div class="btn-action-group">
-                  <div class="me-2" style="min-width: 140px;">
+            <div class="d-flex align-items-center header-title-group">
+                <h1 class="page-title"><i class="iconfont icon-list-ul"></i> 域名列表 <span class="count-badge" id="totalDomainCount">(0)</span></h1>
+                <div class="ms-3 category-dropdown-wrapper">
                       <select class="form-select form-select-sm" id="categoryFilter" aria-label="分类筛选">
                           <option value="all">所有分类</option>
                       </select>
-                  </div>
+                </div>
+            </div>
+            <div class="btn-action-group">
                   <div class="btn-group me-2">
                       <button class="btn btn-outline-info btn-action view-option" data-view="collapse-all" type="button" style="transition: background-color 0.2s, color 0.2s;">
                          <i class="iconfont icon-quanjusuoxiao"></i> <span class="view-text">折叠</span>
