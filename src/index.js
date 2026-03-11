@@ -1140,45 +1140,69 @@ const getHTMLContent = (title) => `
             box-shadow: var(--card-shadow);
             animation: skeleton-pulse 1.5s infinite ease-in-out;
         }
-        
+
         .skeleton-header {
             background-color: var(--card-header-bg);
-            padding: 16px;
+            padding: 12px 20px;
             border-bottom: 1px solid var(--card-border-bottom);
             border-top-left-radius: 16px;
             border-top-right-radius: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 72px;
+            box-sizing: border-box;
         }
-        
+
+        .skeleton-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: rgba(128, 128, 128, 0.15);
+            flex-shrink: 0;
+        }
+
+        .skeleton-domain {
+            flex: 1;
+            min-width: 0;
+        }
+
         .skeleton-text-lg {
-            height: 24px;
+            height: 20px;
             background-color: rgba(128, 128, 128, 0.1);
             border-radius: 4px;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             width: 70%;
         }
-        
+
         .skeleton-text-sm {
-            height: 16px;
-            background-color: rgba(128, 128, 128, 0.1);
+            height: 14px;
+            background-color: rgba(128, 128, 128, 0.08);
             border-radius: 4px;
-            width: 50%;
+            width: 40%;
         }
-        
-        .skeleton-text {
-            height: 16px;
+
+        .skeleton-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .skeleton-badge {
+            width: 48px;
+            height: 22px;
             background-color: rgba(128, 128, 128, 0.1);
-            border-radius: 4px;
-            margin-bottom: 8px;
-            width: 90%;
+            border-radius: 6px;
         }
-        
-        .skeleton-progress {
+
+        .skeleton-toggle {
+            width: 24px;
             height: 24px;
-            background-color: rgba(128, 128, 128, 0.1);
-            border-radius: 12px;
-            margin-top: 16px;
+            background-color: rgba(128, 128, 128, 0.08);
+            border-radius: 4px;
         }
-        
+
         @keyframes skeleton-pulse {
             0% {
                 opacity: 0.6;
@@ -1452,14 +1476,21 @@ const getHTMLContent = (title) => `
         
         /* 视图按钮样式 */
         .view-option {
-            color: rgb(80, 80, 80) !important; /* 修改：加深文字颜色，修复亮色主题下看不清的问题 */
-            background-color: rgba(204, 204, 204, 0.8) !important; /* 未选状态的背景色 */
-            border-color:rgba(109, 109, 109, 0.3) !important; /* 修改边框颜色 */
+            color: rgba(255, 255, 255, 0.75) !important;
+            background-color: rgba(0, 0, 0, 0.2) !important;
+            border-color: rgba(255, 255, 255, 0.15) !important;
+            transition: all 0.3s ease !important;
         }
-        
+        .view-option:hover {
+            color: rgba(255, 255, 255, 0.95) !important;
+            background-color: rgba(0, 0, 0, 0.3) !important;
+        }
+
         .view-option.btn-info {
-            background-color:rgb(255, 255, 255) !important; /* 修改选中状态背景色为蓝色 */
-            color: rgb(31, 34, 39) !important; /* 选中状态使用白色文字 */
+            background-color: var(--info-color) !important;
+            color: #fff !important;
+            border-color: var(--info-color) !important;
+            box-shadow: 0 0 12px rgba(23, 162, 184, 0.45);
         }
         
         .view-option .view-text {
@@ -1662,10 +1693,66 @@ const getHTMLContent = (title) => `
             flex-grow: 1;
             max-width: 40px;
         }
-        
+
         .btn-icon-only .iconfont {
             margin: 0;
             font-size: 1.2rem;
+        }
+
+        /* 主题切换按钮美化 */
+        .theme-toggle-btn {
+            width: 42px;
+            height: 42px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            border: 2px solid rgba(0, 0, 0, 0.25);
+            background: rgba(0, 0, 0, 0.08);
+            backdrop-filter: blur(10px);
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .theme-toggle-btn:hover {
+            transform: rotate(20deg) scale(1.1);
+            border-color: rgba(0, 0, 0, 0.4);
+            background: rgba(0, 0, 0, 0.12);
+            box-shadow: 0 0 16px rgba(100, 100, 180, 0.3);
+        }
+        .theme-toggle-btn:active {
+            transform: rotate(20deg) scale(0.95);
+        }
+        .theme-toggle-btn svg {
+            width: 22px;
+            height: 22px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .theme-toggle-btn .sun-icon {
+            color: #fbbf24;
+            display: none;
+            filter: drop-shadow(0 0 3px rgba(251, 191, 36, 0.5));
+        }
+        .theme-toggle-btn .moon-icon {
+            color: #4a5568;
+            filter: drop-shadow(0 0 2px rgba(74, 85, 104, 0.3));
+        }
+        [data-theme="dark"] .theme-toggle-btn {
+            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.12);
+        }
+        [data-theme="dark"] .theme-toggle-btn:hover {
+            border-color: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+        }
+        [data-theme="dark"] .theme-toggle-btn .sun-icon {
+            display: block;
+        }
+        [data-theme="dark"] .theme-toggle-btn .moon-icon {
+            display: none;
         }
         
         /* 纯图标链接样式 */
@@ -2107,8 +2194,21 @@ const getHTMLContent = (title) => `
                 <span style="text-shadow: none;">${title}</span>
             </span>
             <div class="navbar-actions">
-                <button class="btn btn-outline-primary me-2 btn-icon-only" id="themeToggleBtn" title="切换主题">
-                    <i class="iconfont icon-moon" id="themeIcon"></i>
+                <button class="theme-toggle-btn me-2" id="themeToggleBtn" title="切换主题">
+                    <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
                 </button>
                 <button class="btn btn-secondary me-3" data-bs-toggle="modal" data-bs-target="#settingsModal">
                     <i class="iconfont icon-gear"></i> <span>系统设置</span>
@@ -3063,31 +3163,20 @@ const getHTMLContent = (title) => `
             
             // 主题切换功能
             const themeToggleBtn = document.getElementById('themeToggleBtn');
-            const themeIcon = document.getElementById('themeIcon');
-            
+
             // 初始化主题
             const savedTheme = localStorage.getItem('theme') || 'light';
             document.documentElement.setAttribute('data-theme', savedTheme);
-            updateThemeIcon(savedTheme);
-            
+            themeToggleBtn.title = savedTheme === 'dark' ? '切换到亮色主题' : '切换到暗色主题';
+
             themeToggleBtn.addEventListener('click', function() {
                 const currentTheme = document.documentElement.getAttribute('data-theme');
                 const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-                
+
                 document.documentElement.setAttribute('data-theme', newTheme);
                 localStorage.setItem('theme', newTheme);
-                updateThemeIcon(newTheme);
+                themeToggleBtn.title = newTheme === 'dark' ? '切换到亮色主题' : '切换到暗色主题';
             });
-            
-            function updateThemeIcon(theme) {
-                if (theme === 'dark') {
-                    themeIcon.className = 'iconfont icon-sun';
-                    themeToggleBtn.title = '切换到亮色主题';
-                } else {
-                    themeIcon.className = 'iconfont icon-moon';
-                    themeToggleBtn.title = '切换到暗色主题';
-                }
-            }
         }
         
         // 自定义备注颜色预览函数
@@ -3176,17 +3265,19 @@ const getHTMLContent = (title) => `
             }
         }
         
-        // 生成骨架屏卡片
+        // 生成骨架屏卡片（匹配实际卡片折叠态的结构和尺寸）
         function generateSkeletonCard() {
-            return '<div class="domain-card skeleton-card mb-3">' +
-                '<div class="domain-header skeleton-header">' +
-                    '<div class="skeleton-text-lg"></div>' +
-                    '<div class="skeleton-text-sm"></div>' +
-                '</div>' +
-                '<div class="domain-body">' +
-                    '<div class="skeleton-text"></div>' +
-                    '<div class="skeleton-text"></div>' +
-                    '<div class="skeleton-progress"></div>' +
+            return '<div class="card domain-card skeleton-card mb-2">' +
+                '<div class="skeleton-header">' +
+                    '<div class="skeleton-dot"></div>' +
+                    '<div class="skeleton-domain">' +
+                        '<div class="skeleton-text-lg"></div>' +
+                        '<div class="skeleton-text-sm"></div>' +
+                    '</div>' +
+                    '<div class="skeleton-status">' +
+                        '<div class="skeleton-badge"></div>' +
+                        '<div class="skeleton-toggle"></div>' +
+                    '</div>' +
                 '</div>' +
             '</div>';
         }
