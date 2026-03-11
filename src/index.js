@@ -1,8 +1,25 @@
 /*
- * 域名监控系统 - Cloudflare Workers
+ * 域名监控系统 - Cloudflare Workers (ES Module 格式)
  * 使用KV存储域名信息，支持Telegram通知
  * 功能：域名到期监控、自动通知、域名管理
  */
+
+// 导入 TCP socket 支持（用于 WHOIS 协议直连查询）
+import { connect } from 'cloudflare:sockets';
+
+// 将环境变量注入 globalThis，使已有的 typeof VAR !== 'undefined' 检查继续工作
+function injectEnv(env) {
+	const envKeys = [
+		'DOMAIN_MONITOR', 'TOKEN', 'SITE_NAME', 'LOGO_URL',
+		'BACKGROUND_URL', 'MOBILE_BACKGROUND_URL',
+		'TG_TOKEN', 'TG_ID', 'WHOISJSON_API_KEY'
+	];
+	for (const key of envKeys) {
+		if (env[key] !== undefined) {
+			globalThis[key] = env[key];
+		}
+	}
+}
 
 // ================================
 // 配置常量区域
@@ -49,6 +66,30 @@ function jsonResponse(data, status = 200) {
     status,
     headers: { 'Content-Type': 'application/json' }
   });
+}
+
+// 判断域名是否支持WHOIS查询，返回对应的查询函数或null
+function getWhoisQueryFunction(domainName) {
+  const lowerDomain = domainName.toLowerCase();
+  const dotCount = lowerDomain.split('.').length - 1;
+
+  // pp.ua 二级域名
+  if (lowerDomain.endsWith('.pp.ua')) {
+    return queryPpUaWhois;
+  }
+  // DigitalPlat 二级域名
+  if (lowerDomain.endsWith('.qzz.io') || lowerDomain.endsWith('.dpdns.org') ||
+      lowerDomain.endsWith('.us.kg') || lowerDomain.endsWith('.xx.kg')) {
+    return queryDigitalPlatWhois;
+  }
+  // 一级域名且配置了WhoisJSON API密钥
+  if (dotCount === 1) {
+    const apiKey = typeof WHOISJSON_API_KEY !== 'undefined' ? WHOISJSON_API_KEY : DEFAULT_WHOISJSON_API_KEY;
+    if (apiKey) {
+      return queryDomainWhois;
+    }
+  }
+  return null;
 }
 
 // WhoisJSON API查询函数
@@ -168,33 +209,55 @@ async function queryPpUaWhois(domain) {
 }
 
 // DigitalPlat 域名查询函数 (用于 qzz.io, dpdns.org, us.kg, xx.kg)
+// 通过 TCP socket 直连 WHOIS 服务器查询，等同于: whois -h whois.digitalplat.org "domain"
 async function queryDigitalPlatWhois(domain) {
   try {
-    // 使用 corsproxy.io 代理请求，解决 Cloudflare Workers 直接访问可能出现的 TLS/SSL 握手错误
-    const targetUrl = `https://dash.domain.digitalplat.org/whois?name=${encodeURIComponent(domain)}`;
-    const response = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`, {
-      method: 'GET',
-      headers: {
-        'accept': 'text/html',
-        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
+    // 连接 DigitalPlat WHOIS 服务器（TCP 端口 43，明文）
+    // connect 来自顶层 import { connect } from 'cloudflare:sockets'
+    const socket = connect({ hostname: 'whois.digitalplat.org', port: 43 });
+
+    // 发送 WHOIS 查询（协议格式：域名 + \r\n）
+    const writer = socket.writable.getWriter();
+    const encoder = new TextEncoder();
+    await writer.write(encoder.encode(domain + '\r\n'));
+    await writer.close();
+
+    // 读取完整响应，带 10 秒超时保护
+    const reader = socket.readable.getReader();
+    const decoder = new TextDecoder();
+    let whoisText = '';
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      reader.cancel();
+    }, 10000);
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        whoisText += decoder.decode(value, { stream: true });
       }
-    });
-    if (!response.ok) {
-      throw new Error(`DigitalPlat API请求失败: ${response.status} ${response.statusText}`);
+      // 刷新 decoder 中可能残留的字节
+      whoisText += decoder.decode();
+    } finally {
+      clearTimeout(timeoutId);
     }
 
-    const whoisText = await response.text();
-    
-    // 检查是否未找到域名
-    if (whoisText.includes('Domain not found')) {
-        return {
-            success: true,
-            domain: domain,
-            registered: false,
-            raw: whoisText
-        };
+    if (timedOut && !whoisText) {
+      throw new Error('WHOIS查询超时（10秒）');
     }
-    
+
+    // 检查是否未找到域名
+    if (whoisText.includes('Domain not found') || whoisText.includes('No match') || whoisText.includes('NOT FOUND')) {
+      return {
+        success: true,
+        domain: domain,
+        registered: false,
+        raw: whoisText
+      };
+    }
+
     // 解析 WHOIS 文本
     const parseField = (regex) => {
       const match = whoisText.match(regex);
@@ -204,15 +267,26 @@ async function queryDigitalPlatWhois(domain) {
     // 适配不同的日期格式
     const createdOn = parseField(/Creation Date:\s*(.+)/i);
     const expiresOn = parseField(/Registry Expiry Date:\s*(.+)/i);
+    const updatedOn = parseField(/Updated Date:\s*(.+)/i);
     const registrar = parseField(/Registrar:\s*(.+)/i);
     const registrarUrl = parseField(/Registrar URL:\s*(.+)/i);
 
-    // 提取 Nameservers
+    // 提取 Nameservers（可能有多行）
     const nameservers = [];
     const nsRegex = /Name Server:\s*(.+)/gi;
-    let match;
-    while ((match = nsRegex.exec(whoisText)) !== null) {
-      nameservers.push(match[1].trim());
+    let nsMatch;
+    while ((nsMatch = nsRegex.exec(whoisText)) !== null) {
+      const ns = nsMatch[1].trim();
+      if (ns) nameservers.push(ns);
+    }
+
+    // 提取所有 Domain Status（可能有多行）
+    const statuses = [];
+    const statusRegex = /Domain Status:\s*(.+)/gi;
+    let statusMatch;
+    while ((statusMatch = statusRegex.exec(whoisText)) !== null) {
+      const s = statusMatch[1].trim();
+      if (s) statuses.push(s);
     }
 
     return {
@@ -221,13 +295,13 @@ async function queryDigitalPlatWhois(domain) {
       registered: !!createdOn,
       registrationDate: createdOn ? formatDate(createdOn) : null,
       expiryDate: expiresOn ? formatDate(expiresOn) : null,
-      lastUpdated: null, // 该接口似乎不总是返回更新时间
+      lastUpdated: updatedOn ? formatDate(updatedOn) : null,
       registrar: registrar || 'DigitalPlat',
       registrarUrl: registrarUrl,
       nameservers: nameservers,
-      status: parseField(/Domain Status:\s*(.+)/i) ? [parseField(/Domain Status:\s*(.+)/i)] : [],
+      status: statuses,
       dnssec: null,
-      raw: whoisText // 保存原始文本
+      raw: whoisText // 保存原始 WHOIS 文本
     };
   } catch (error) {
     console.error(error);
@@ -6067,7 +6141,7 @@ async function sendTelegramMessage(config, message) {
   return await response.json();
 }
 
-// 设置定时任务，检查即将到期的域名并发送通知
+// 设置定时任务，检查即将到期的域名并发送通知（支持WHOIS自动查询更新到期日期）
 async function checkExpiringDomains() {
   const domains = await getDomains();
   const today = new Date();
@@ -6076,50 +6150,109 @@ async function checkExpiringDomains() {
   const telegramConfig = await getTelegramConfigWithToken();
   const globalNotifyDays = telegramConfig.enabled ? telegramConfig.notifyDays : 30;
   
-  // 筛选出即将到期和已过期的域名
-  const domainsToNotify = domains.filter(domain => {
+  // 判断域名是否符合过期提醒条件的辅助函数
+  function needsExpiryNotify(domain) {
     const expiryDate = new Date(domain.expiryDate);
     const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
-    
-    // 获取该域名的通知设置
     const notifySettings = domain.notifySettings || { useGlobalSettings: true, enabled: true, notifyDays: 30 };
-    
-    // 如果使用全局设置，则使用全局通知天数，否则使用域名自己的设置
     const notifyDays = notifySettings.useGlobalSettings ? globalNotifyDays : notifySettings.notifyDays;
+    return notifySettings.enabled && (daysLeft <= 0 || (daysLeft > 0 && daysLeft <= notifyDays));
+  }
+  
+  // 第一步：筛选出所有符合过期提醒条件的域名
+  const domainsToCheck = domains.filter(domain => needsExpiryNotify(domain));
+  
+  // 第二步：遍历待通知域名，进行WHOIS查询并分组
+  const expiringDomains = [];   // 即将到期（剩余天数 > 0）
+  const expiredDomains = [];    // 已过期（剩余天数 <= 0）
+  const updatedDomains = [];    // 到期日期已自动更新（更新后不再符合过期提醒条件）
+  let kvNeedUpdate = false;
+  
+  for (const domain of domainsToCheck) {
+    const whoisFn = getWhoisQueryFunction(domain.name);
+    let currentExpiryDate = domain.expiryDate;
+    let dateChanged = false;
+    let oldExpiryDate = null;
     
-    // 通知已过期的域名或即将到期的域名
-    return notifySettings.enabled && (
-      daysLeft <= 0 || // 已过期
-      (daysLeft > 0 && daysLeft <= notifyDays) // 即将到期
-    );
-  });
-  
-  // 将域名分为已过期和即将到期两组
-  const expiredDomains = domainsToNotify.filter(domain => {
-    const expiryDate = new Date(domain.expiryDate);
-    const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
-    return daysLeft <= 0;
-  });
-  
-  const expiringDomains = domainsToNotify.filter(domain => {
-    const expiryDate = new Date(domain.expiryDate);
-    const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
-    return daysLeft > 0;
-  });
-  
-  // 如果有即将到期或已过期的域名，发送通知
-  if (expiringDomains.length > 0 || expiredDomains.length > 0) {
-    
-    // 如果启用了Telegram通知，则发送通知
-    if (telegramConfig.enabled && 
-        ((telegramConfig.botToken || typeof TG_TOKEN !== 'undefined') && 
-         (telegramConfig.chatId || typeof TG_ID !== 'undefined'))) {
+    // 如果支持WHOIS查询，尝试获取最新到期日期
+    if (whoisFn) {
       try {
-        // 发送合并的域名通知
-        await sendCombinedDomainsNotification(telegramConfig, expiringDomains, expiredDomains);
-      } catch (error) {
-        // 静默处理Telegram通知发送失败
+        const result = await whoisFn(domain.name);
+        if (result.success && result.expiryDate && result.expiryDate !== domain.expiryDate) {
+          // 到期日期有变化，记录旧日期并更新
+          oldExpiryDate = domain.expiryDate;
+          currentExpiryDate = result.expiryDate;
+          dateChanged = true;
+          
+          // 更新domains数组中对应域名的到期日期
+          const idx = domains.findIndex(d => d.id === domain.id);
+          if (idx !== -1) {
+            domains[idx].expiryDate = currentExpiryDate;
+            domains[idx].updatedAt = new Date().toISOString();
+          }
+          kvNeedUpdate = true;
+        }
+      } catch (e) {
+        // WHOIS查询失败，静默跳过，使用原有到期日期继续判断
       }
+    }
+    
+    if (dateChanged) {
+      // 到期日期有变化，用新日期二次判断是否仍符合过期提醒条件
+      const updatedDomain = { ...domain, expiryDate: currentExpiryDate };
+      if (needsExpiryNotify(updatedDomain)) {
+        // 更新后仍符合过期提醒条件，放入过期提醒组
+        const expiryDate = new Date(currentExpiryDate);
+        const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+        if (daysLeft <= 0) {
+          expiredDomains.push(updatedDomain);
+        } else {
+          expiringDomains.push(updatedDomain);
+        }
+      } else {
+        // 更新后不再符合过期提醒条件，放入日期自动更新组
+        const oldDate = new Date(oldExpiryDate);
+        const newDate = new Date(currentExpiryDate);
+        const addedDays = Math.ceil((newDate - oldDate) / (1000 * 60 * 60 * 24));
+        updatedDomains.push({
+          ...domain,
+          oldExpiryDate: oldExpiryDate,
+          newExpiryDate: currentExpiryDate,
+          addedDays: addedDays
+        });
+      }
+    } else {
+      // 到期日期无变化或不支持WHOIS查询，按原有逻辑分组
+      const expiryDate = new Date(currentExpiryDate);
+      const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+      if (daysLeft <= 0) {
+        expiredDomains.push(domain);
+      } else {
+        expiringDomains.push(domain);
+      }
+    }
+  }
+  
+  // 第三步：批量更新KV（所有到期日期有变化的域名一次性写入）
+  if (kvNeedUpdate) {
+    await DOMAIN_MONITOR.put('domains', JSON.stringify(domains));
+  }
+  
+  // 第四步：发送Telegram通知
+  if (telegramConfig.enabled && 
+      ((telegramConfig.botToken || typeof TG_TOKEN !== 'undefined') && 
+       (telegramConfig.chatId || typeof TG_ID !== 'undefined'))) {
+    try {
+      // 发送过期提醒通知
+      if (expiringDomains.length > 0 || expiredDomains.length > 0) {
+        await sendCombinedDomainsNotification(telegramConfig, expiringDomains, expiredDomains);
+      }
+      // 发送域名到期日期自动更新通知
+      if (updatedDomains.length > 0) {
+        await sendDateUpdatedNotification(telegramConfig, updatedDomains);
+      }
+    } catch (error) {
+      // 静默处理Telegram通知发送失败
     }
   }
 }
@@ -6257,21 +6390,51 @@ async function sendCombinedDomainsNotification(config, expiringDomains, expiredD
   return await sendTelegramMessage(config, message);
 }
 
+// 发送域名到期日期自动更新通知
+async function sendDateUpdatedNotification(config, updatedDomains) {
+  if (updatedDomains.length === 0) return;
+  
+  const title = '🔄 <b>域名到期日期自动更新</b> 🔄';
+  const separator = '======================';
+  
+  let message = title + '\n' + separator + '\n\n';
+  
+  updatedDomains.forEach((domain, index) => {
+    if (index > 0) {
+      message += '\n';
+    }
+    
+    message += '🌍 域名: ' + domain.name + '\n';
+    if (domain.registrar) {
+      message += '🏬 注册厂商: ' + domain.registrar + '\n';
+    }
+    if (domain.registeredAccount) {
+      message += '👤 注册账号: ' + domain.registeredAccount + '\n';
+    }
+    message += '📅 原到期日期: ' + formatDate(domain.oldExpiryDate) + '\n';
+    message += '📅 新到期日期: ' + formatDate(domain.newExpiryDate) + '\n';
+    message += '📈 续期增加: ' + domain.addedDays + ' 天\n';
+  });
+  
+  return await sendTelegramMessage(config, message);
+}
+
 
 
 // ================================
-// Cloudflare Workers事件处理
+// Cloudflare Workers事件处理 (ES Module 格式)
 // ================================
 
-// 注册fetch事件处理程序
-addEventListener('fetch', event => {
-  event.respondWith(handleRequest(event.request));
-});
-
-// 注册定时任务，每天检查一次
-addEventListener('scheduled', event => {
-  event.waitUntil(checkExpiringDomains());
-});
+export default {
+  async fetch(request, env, ctx) {
+    injectEnv(env);
+    return handleRequest(request);
+  },
+  async scheduled(event, env, ctx) {
+    injectEnv(env);
+    ctx.waitUntil(checkExpiringDomains());
+  }
+};
 
 // ================================
 // 辅助函数区域

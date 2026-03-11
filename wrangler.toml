@@ -1,0 +1,7 @@
+name="domain-check"
+main="src/index.js"
+compatibility_date="2025-12-12"
+keep_vars = true
+
+[[kv_namespaces]]
+binding = "DOMAIN_MONITOR"

@@ -1,0 +1,9 @@
+name="domain-check"
+main="src/index.js"
+compatibility_date="2025-12-12"
+
+[[kv_namespaces]]
+binding = "DOMAIN_MONITOR"
+
+[vars]
+WHOISJSON_API_KEY = "d967ca510b1b7585890f426f41087fc505ef9413193240901c7bcf50a799adf4"
