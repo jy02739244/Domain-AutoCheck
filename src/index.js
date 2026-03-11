@@ -245,6 +245,9 @@ async function queryDigitalPlatWhois(domain) {
       }
       // 刷新 decoder 中可能残留的字节
       whoisText += decoder.decode();
+    } catch (readError) {
+      // reader.cancel() from timeout causes "Stream was cancelled" — handle gracefully
+      if (!timedOut) throw readError;
     } finally {
       clearTimeout(timeoutId);
       // 确保 socket 被正确关闭
@@ -341,11 +344,13 @@ const getLoginHTML = (title) => `
     <!-- 添加网站图标(favicon) -->
     <link rel="icon" href="${typeof LOGO_URL !== 'undefined' ? LOGO_URL : DEFAULT_LOGO}" type="image/png">
     <link rel="shortcut icon" href="${typeof LOGO_URL !== 'undefined' ? LOGO_URL : DEFAULT_LOGO}" type="image/png">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="//at.alicdn.com">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- 添加阿里巴巴iconfont图标库支持 -->
     <link rel="stylesheet" href="${ICONFONT_CSS}">
     <!-- 确保图标正确加载 -->
-    <script src="${ICONFONT_JS}"></script>
+    <script async src="${ICONFONT_JS}"></script>
     <style>
         :root {
             --primary-color: #6366f1;
@@ -598,8 +603,7 @@ const getHTMLContent = (title) => `
             --domain-note-spacing: 2px;
             --domain-line-height: 1.15;
             
-            --bg-blur: 2px; /* 背景模糊程度 */
-            --bg-overlay: rgba(241, 245, 249, 0.6);
+            --bg-overlay: rgba(241, 245, 249, 0.75);
             --card-header-bg: rgba(255, 255, 255, 0.5);
             --card-border-bottom: rgba(0, 0, 0, 0.05);
             --input-bg: #fff;
@@ -626,7 +630,7 @@ const getHTMLContent = (title) => `
             --border-glass: rgba(255, 255, 255, 0.18);
             --card-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
             
-            --bg-overlay: rgba(0, 0, 0, 0.55);
+            --bg-overlay: rgba(0, 0, 0, 0.65);
             --card-header-bg: rgba(255, 255, 255, 0.1);
             --card-border-bottom: rgba(255, 255, 255, 0.18);
             --input-bg: rgba(255, 255, 255, 0.2);
@@ -638,43 +642,34 @@ const getHTMLContent = (title) => `
         
         body {
             font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
-            background-image: var(--bg-image);
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
+            background: none;
             padding-top: 20px;
             position: relative;
             min-height: 100vh;
             color: var(--text-main);
             transition: color 0.3s ease;
         }
-        
+
+        /* 使用伪元素固定背景，避免 background-attachment: fixed 的重绘开销 */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background-image: var(--bg-image);
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: -2;
+            pointer-events: none;
+        }
+
         /* 移动端背景图片优化 */
         @media (max-width: 768px) {
-            body {
-                background-attachment: scroll;
-                background-size: cover;
-                background-position: center top;
-                min-height: 100vh;
-                /* 移动端暂不区分主题背景，统一使用 CSS 变量控制的桌面端背景，或者在这里也引入变量逻辑 */
-                background-image: var(--bg-image); 
-            }
-            
-            /* 使用伪元素固定背景，避免缩放问题 */
             body::after {
-                content: '';
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100vh;
-                background-image: var(--bg-image);
-                background-size: cover;
-                background-position: center;
-                background-repeat: no-repeat;
-                z-index: -2;
-                pointer-events: none;
+                background-position: center top;
             }
         }
         
@@ -686,15 +681,14 @@ const getHTMLContent = (title) => `
             right: 0;
             bottom: 0;
             background-color: var(--bg-overlay);
-            backdrop-filter: blur(var(--bg-blur));
+            /* backdrop-filter: blur(var(--bg-blur)); Removed for performance */
             z-index: -1;
             transition: background-color 0.3s ease;
         }
         
         .navbar {
-            background-color: var(--bg-glass);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
+            background-color: rgba(255, 255, 255, 0.92);
+            /* backdrop-filter removed for performance */
             box-shadow: var(--card-shadow);
             border: 1px solid var(--border-glass);
             margin-bottom: 24px;
@@ -706,7 +700,11 @@ const getHTMLContent = (title) => `
             position: relative;
             z-index: 2;
         }
-        
+
+        [data-theme="dark"] .navbar {
+            background-color: rgba(30, 30, 40, 0.92);
+        }
+
         .navbar-brand {
             display: flex;
             align-items: center;
@@ -791,16 +789,19 @@ const getHTMLContent = (title) => `
             gap: 10px;
             margin-bottom: 20px;
             padding: 16px 24px;
-            background-color: var(--bg-glass);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
+            background-color: rgba(255, 255, 255, 0.92);
+            /* backdrop-filter removed for performance */
             border: 1px solid var(--border-glass);
             border-radius: 16px;
             box-shadow: var(--card-shadow);
             position: relative;
             z-index: 2;
         }
-        
+
+        [data-theme="dark"] .page-header {
+            background-color: rgba(30, 30, 40, 0.92);
+        }
+
         .page-title {
             font-size: 1.25rem;
             font-weight: 700;
@@ -855,7 +856,7 @@ const getHTMLContent = (title) => `
             border-radius: 16px;
             box-shadow: var(--card-shadow);
             margin-bottom: 12px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             overflow: hidden !important;
             position: relative;
             z-index: 1;
@@ -1297,9 +1298,14 @@ const getHTMLContent = (title) => `
             margin: 0;
             padding: 0;
         }
-        
+
+        .collapse:not(.show) {
+            content-visibility: auto;
+            contain-intrinsic-size: 0 200px;
+        }
+
         .domain-card {
-            transition: all 0.3s;
+            transition: transform 0.3s, box-shadow 0.3s;
         }
         
         .domain-card:hover {
@@ -1702,10 +1708,9 @@ const getHTMLContent = (title) => `
             text-overflow: ellipsis;
             color: white;
             border: none;
-            backdrop-filter: blur(5px);
-            -webkit-backdrop-filter: blur(5px);
+            /* backdrop-filter removed for performance */
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-            transition: all 0.3s ease;
+            transition: box-shadow 0.3s ease;
         }
         
         .domain-actions .btn:hover,
@@ -1850,15 +1855,19 @@ const getHTMLContent = (title) => `
         /* 确保下拉菜单显示在最上层 */
         .dropdown-menu {
             z-index: 1050 !important;
-            background-color: rgba(255, 255, 255, 0.95) !important;
-            backdrop-filter: blur(10px) !important;
-            -webkit-backdrop-filter: blur(10px) !important;
+            background-color: rgba(255, 255, 255, 1.0) !important;
+            /* backdrop-filter removed for performance */
             border: 1px solid var(--border-glass) !important;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1) !important;
             padding: 8px !important;
             border-radius: 12px !important;
         }
-        
+
+        [data-theme="dark"] .dropdown-menu {
+            background-color: rgba(30, 30, 40, 1.0) !important;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+        }
+
         .dropdown-item {
             font-size: 0.85rem;
             padding: 0.6rem 1rem;
@@ -3928,105 +3937,88 @@ const getHTMLContent = (title) => `
             });
         }, 50);
     }
-            
-            // 添加事件监听器
-            document.querySelectorAll('.edit-domain').forEach(button => {
-                button.addEventListener('click', () => editDomain(button.dataset.id));
-            });
-            
-            document.querySelectorAll('.delete-domain').forEach(button => {
-                button.addEventListener('click', () => showDeleteModal(button.dataset.id, button.dataset.name));
-            });
-            
-            // 分类下添加域名按钮事件
-            document.querySelectorAll('.add-domain-to-category').forEach(button => {
-                button.addEventListener('click', async () => {
-                    const categoryId = button.getAttribute('data-category-id');
-                    await openAddDomainModal(categoryId);
-                });
-            });
-            
-            document.querySelectorAll('.renew-domain').forEach(button => {
-                button.addEventListener('click', () => showRenewModal(button.dataset.id, button.dataset.name, button.dataset.expiry));
-            });
-            
-            
-            // 添加下拉按钮的事件监听器
-            document.querySelectorAll('.toggle-details').forEach(button => {
-                // 监听Bootstrap折叠/展开事件，更新域名显示样式
-                const collapseTarget = document.querySelector(button.getAttribute('data-bs-target'));
-                if (collapseTarget) {
-                    // 监听展开事件
-                    collapseTarget.addEventListener('shown.bs.collapse', function() {
-                        // 找到包含此折叠内容的卡片
-                        const domainCard = this.closest('.domain-card');
-                        if (domainCard) {
-                            // 添加expanded类，使域名可以换行显示
-                            domainCard.classList.add('expanded');
-                        }
-                    });
-                    
-                    // 监听折叠事件
-                    collapseTarget.addEventListener('hidden.bs.collapse', function() {
-                        // 找到包含此折叠内容的卡片
-                        const domainCard = this.closest('.domain-card');
-                        if (domainCard) {
-                            // 移除expanded类，使域名显示省略号
-                            domainCard.classList.remove('expanded');
-                        }
-                    });
-                }
-                
-                // 原有的点击事件处理
-                button.addEventListener('click', function(e) {
-                    // 如果当前是全部折叠模式，点击切换按钮会切换到自动折叠模式
-                    // 但如果是全部展开模式，则保持该模式
-                    if (viewMode === 'collapse-all') {
-                        // 先阻止默认的bootstrap折叠/展开行为
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        // 切换到自动折叠模式
-                        viewMode = 'auto-collapse';
-                        
-                        // 获取当前按钮对应的卡片详情
-                        const collapseTarget = document.querySelector(button.getAttribute('data-bs-target'));
-                        
-                        // 折叠所有其他卡片
-                        document.querySelectorAll('.collapse.show').forEach(detail => {
-                            if (detail !== collapseTarget) {
-                                bootstrap.Collapse.getInstance(detail)?.hide();
-                            }
-                        });
-                        
-                        // 切换当前卡片的状态
-                        const collapseInstance = bootstrap.Collapse.getInstance(collapseTarget);
-                        if (collapseInstance) {
-                            if (collapseTarget.classList.contains('show')) {
-                                collapseInstance.hide();
-                            } else {
-                                collapseInstance.show();
-                            }
-                        }
-                    } else if (viewMode === 'expand-all') {
-                        // 在全部展开模式下，只处理折叠操作，不改变viewMode
-                        const collapseTarget = document.querySelector(button.getAttribute('data-bs-target'));
-                        const collapseInstance = bootstrap.Collapse.getInstance(collapseTarget);
-                        
-                        // 只有当用户尝试折叠卡片时才处理
-                        if (collapseTarget.classList.contains('show')) {
-                            // 先阻止默认的bootstrap折叠行为
+
+            // 事件委托：在容器上统一监听点击事件，替代逐元素绑定
+            if (!domainListContainer._delegated) {
+                domainListContainer._delegated = true;
+                domainListContainer.addEventListener('click', function(e) {
+                    const editBtn = e.target.closest('.edit-domain');
+                    if (editBtn) {
+                        editDomain(editBtn.dataset.id);
+                        return;
+                    }
+
+                    const deleteBtn = e.target.closest('.delete-domain');
+                    if (deleteBtn) {
+                        showDeleteModal(deleteBtn.dataset.id, deleteBtn.dataset.name);
+                        return;
+                    }
+
+                    const addBtn = e.target.closest('.add-domain-to-category');
+                    if (addBtn) {
+                        const categoryId = addBtn.getAttribute('data-category-id');
+                        openAddDomainModal(categoryId);
+                        return;
+                    }
+
+                    const renewBtn = e.target.closest('.renew-domain');
+                    if (renewBtn) {
+                        showRenewModal(renewBtn.dataset.id, renewBtn.dataset.name, renewBtn.dataset.expiry);
+                        return;
+                    }
+
+                    const toggleBtn = e.target.closest('.toggle-details');
+                    if (toggleBtn) {
+                        if (viewMode === 'collapse-all') {
                             e.preventDefault();
                             e.stopPropagation();
-                            
-                            // 手动折叠当前卡片
-                            collapseInstance?.hide();
+
+                            viewMode = 'auto-collapse';
+
+                            const collapseTarget = document.querySelector(toggleBtn.getAttribute('data-bs-target'));
+
+                            document.querySelectorAll('.collapse.show').forEach(detail => {
+                                if (detail !== collapseTarget) {
+                                    bootstrap.Collapse.getInstance(detail)?.hide();
+                                }
+                            });
+
+                            const collapseInstance = bootstrap.Collapse.getInstance(collapseTarget);
+                            if (collapseInstance) {
+                                if (collapseTarget.classList.contains('show')) {
+                                    collapseInstance.hide();
+                                } else {
+                                    collapseInstance.show();
+                                }
+                            }
+                        } else if (viewMode === 'expand-all') {
+                            const collapseTarget = document.querySelector(toggleBtn.getAttribute('data-bs-target'));
+                            const collapseInstance = bootstrap.Collapse.getInstance(collapseTarget);
+
+                            if (collapseTarget.classList.contains('show')) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                collapseInstance?.hide();
+                            }
                         }
-                        // 如果是尝试展开一个已折叠的卡片，使用默认行为
                     }
-                    // 在自动折叠模式下，使用默认的bootstrap行为
                 });
-            });
+
+                // Bootstrap collapse 事件冒泡委托
+                domainListContainer.addEventListener('shown.bs.collapse', function(e) {
+                    const domainCard = e.target.closest('.domain-card');
+                    if (domainCard) {
+                        domainCard.classList.add('expanded');
+                    }
+                });
+
+                domainListContainer.addEventListener('hidden.bs.collapse', function(e) {
+                    const domainCard = e.target.closest('.domain-card');
+                    if (domainCard) {
+                        domainCard.classList.remove('expanded');
+                    }
+                });
+            }
         }
         
         // 保存域名
@@ -4501,7 +4493,7 @@ const getHTMLContent = (title) => `
                     userCategories.forEach((category, index) => {
                         const categoryItem = document.createElement('div');
                         categoryItem.className = 'mb-3 p-3 rounded category-item';
-                        categoryItem.style.cssText = 'background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); backdrop-filter: blur(10px);';
+                        categoryItem.style.cssText = 'background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.2);';
                         categoryItem.innerHTML = 
                             '<div class="d-flex justify-content-between align-items-start">' +
                                 '<div class="flex-grow-1">' +
@@ -6485,8 +6477,7 @@ function addCopyrightFooter(html) {
           border-top: 1px solid var(--border-glass);
           margin-top: auto;
           background-color: var(--bg-glass);
-          backdrop-filter: blur(5px);
-          -webkit-backdrop-filter: blur(5px);
+          /* backdrop-filter removed for performance */
           color: var(--text-muted);
           text-shadow: none;
           white-space: nowrap;
@@ -6557,7 +6548,7 @@ function addCopyrightFooter(html) {
   
   // 如果没找到</body>标签，就直接添加到HTML末尾
   const footerHtml = `
-    <div style="text-align: center; padding: 10px; font-size: ${footerFontSize}; margin-top: 20px; border-top: 1px solid var(--border-glass); background-color: var(--bg-glass); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+    <div style="text-align: center; padding: 10px; font-size: ${footerFontSize}; margin-top: 20px; border-top: 1px solid var(--border-glass); background-color: var(--bg-glass); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
       ${footerContent}
     </div>
   `;
