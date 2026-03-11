@@ -7,18 +7,22 @@
 // 导入 TCP socket 支持（用于 WHOIS 协议直连查询）
 import { connect } from 'cloudflare:sockets';
 
-// 将环境变量注入 globalThis，使已有的 typeof VAR !== 'undefined' 检查继续工作
+// 环境变量声明（运行时由 injectEnv 注入）
+let DOMAIN_MONITOR, TOKEN, SITE_NAME, LOGO_URL,
+    BACKGROUND_URL, MOBILE_BACKGROUND_URL,
+    TG_TOKEN, TG_ID, WHOISJSON_API_KEY;
+
+// 将环境变量注入模块作用域，使已有的 typeof VAR !== 'undefined' 检查继续工作
 function injectEnv(env) {
-	const envKeys = [
-		'DOMAIN_MONITOR', 'TOKEN', 'SITE_NAME', 'LOGO_URL',
-		'BACKGROUND_URL', 'MOBILE_BACKGROUND_URL',
-		'TG_TOKEN', 'TG_ID', 'WHOISJSON_API_KEY'
-	];
-	for (const key of envKeys) {
-		if (env[key] !== undefined) {
-			globalThis[key] = env[key];
-		}
-	}
+	if (env.DOMAIN_MONITOR !== undefined) DOMAIN_MONITOR = env.DOMAIN_MONITOR;
+	if (env.TOKEN !== undefined) TOKEN = env.TOKEN;
+	if (env.SITE_NAME !== undefined) SITE_NAME = env.SITE_NAME;
+	if (env.LOGO_URL !== undefined) LOGO_URL = env.LOGO_URL;
+	if (env.BACKGROUND_URL !== undefined) BACKGROUND_URL = env.BACKGROUND_URL;
+	if (env.MOBILE_BACKGROUND_URL !== undefined) MOBILE_BACKGROUND_URL = env.MOBILE_BACKGROUND_URL;
+	if (env.TG_TOKEN !== undefined) TG_TOKEN = env.TG_TOKEN;
+	if (env.TG_ID !== undefined) TG_ID = env.TG_ID;
+	if (env.WHOISJSON_API_KEY !== undefined) WHOISJSON_API_KEY = env.WHOISJSON_API_KEY;
 }
 
 // ================================
@@ -220,7 +224,8 @@ async function queryDigitalPlatWhois(domain) {
     const writer = socket.writable.getWriter();
     const encoder = new TextEncoder();
     await writer.write(encoder.encode(domain + '\r\n'));
-    await writer.close();
+    // 释放 writer 锁而非关闭，避免生产环境中 close() 导致整个 socket 被关闭
+    writer.releaseLock();
 
     // 读取完整响应，带 10 秒超时保护
     const reader = socket.readable.getReader();
@@ -242,6 +247,8 @@ async function queryDigitalPlatWhois(domain) {
       whoisText += decoder.decode();
     } finally {
       clearTimeout(timeoutId);
+      // 确保 socket 被正确关闭
+      socket.close();
     }
 
     if (timedOut && !whoisText) {
@@ -3386,7 +3393,7 @@ const getHTMLContent = (title) => `
             domains.forEach(domain => {
                 const expiryDate = new Date(domain.expiryDate);
                 const today = new Date();
-                domain.daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+                domain.daysLeft = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
             });
             
             // 按照指定字段和顺序排序
@@ -3653,7 +3660,7 @@ const getHTMLContent = (title) => `
                         if (domain.lastRenewed) {
                             const today = new Date();
                             const expiryDate = new Date(domain.expiryDate);
-                            const newDaysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+                            const newDaysLeft = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                             
                             if (newDaysLeft >= cycleDays) {
                                 progressPercent = 100;
@@ -6153,7 +6160,7 @@ async function checkExpiringDomains() {
   // 判断域名是否符合过期提醒条件的辅助函数
   function needsExpiryNotify(domain) {
     const expiryDate = new Date(domain.expiryDate);
-    const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+    const daysLeft = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     const notifySettings = domain.notifySettings || { useGlobalSettings: true, enabled: true, notifyDays: 30 };
     const notifyDays = notifySettings.useGlobalSettings ? globalNotifyDays : notifySettings.notifyDays;
     return notifySettings.enabled && (daysLeft <= 0 || (daysLeft > 0 && daysLeft <= notifyDays));
@@ -6203,7 +6210,7 @@ async function checkExpiringDomains() {
       if (needsExpiryNotify(updatedDomain)) {
         // 更新后仍符合过期提醒条件，放入过期提醒组
         const expiryDate = new Date(currentExpiryDate);
-        const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+        const daysLeft = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
         if (daysLeft <= 0) {
           expiredDomains.push(updatedDomain);
         } else {
@@ -6213,7 +6220,7 @@ async function checkExpiringDomains() {
         // 更新后不再符合过期提醒条件，放入日期自动更新组
         const oldDate = new Date(oldExpiryDate);
         const newDate = new Date(currentExpiryDate);
-        const addedDays = Math.ceil((newDate - oldDate) / (1000 * 60 * 60 * 24));
+        const addedDays = Math.ceil((newDate.getTime() - oldDate.getTime()) / (1000 * 60 * 60 * 24));
         updatedDomains.push({
           ...domain,
           oldExpiryDate: oldExpiryDate,
@@ -6224,7 +6231,7 @@ async function checkExpiringDomains() {
     } else {
       // 到期日期无变化或不支持WHOIS查询，按原有逻辑分组
       const expiryDate = new Date(currentExpiryDate);
-      const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+      const daysLeft = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       if (daysLeft <= 0) {
         expiredDomains.push(domain);
       } else {
@@ -6279,8 +6286,8 @@ async function sendExpiringDomainsNotification(config, domains, isExpired) {
   domains.forEach((domain, index) => {
     const expiryDate = new Date(domain.expiryDate);
     const today = new Date();
-    const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
-    
+    const daysLeft = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
     if (index > 0) {
       message += '\n' + domainSeparator + '\n\n';
     }
@@ -6323,7 +6330,7 @@ async function sendCombinedDomainsNotification(config, expiringDomains, expiredD
     expiringDomains.forEach((domain, index) => {
       const expiryDate = new Date(domain.expiryDate);
       const today = new Date();
-      const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+      const daysLeft = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       
       if (index > 0) {
         message += '\n';
@@ -6362,7 +6369,7 @@ async function sendCombinedDomainsNotification(config, expiringDomains, expiredD
     expiredDomains.forEach((domain, index) => {
       const expiryDate = new Date(domain.expiryDate);
       const today = new Date();
-      const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+      const daysLeft = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       
       if (index > 0) {
         message += '\n';
