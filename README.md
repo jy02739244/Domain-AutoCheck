@@ -70,7 +70,39 @@
 | 剩余天数是周期的10%-30%   | 🟡即将过期 |
 | 剩余天数大于等于周期的30% | 🟢正常     |
 
-## 🚀部署流程
+## 🔗 Fork 部署（推荐）
+
+Fork 部署可以保持与上游仓库的关联，方便后续通过 **Sync fork** 同步更新。
+
+### 第一步：Fork 本仓库
+
+点击右上角 **Fork** 按钮，将项目复制到你的 GitHub 账号。
+
+### 第二步：部署到 Cloudflare
+
+[![Deploy with Cloudflare](https://img.shields.io/badge/Cloudflare-部署到_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://dash.cloudflare.com/?to=/:account/workers-and-pages/create)
+
+点击上方按钮，选择 **Continue with GitHub**，然后选择你 Fork 后的仓库进行部署。  
+部署时 Cloudflare 会自动创建并绑定 `DOMAIN_MONITOR` KV 命名空间。
+
+### 第三步：配置环境变量
+
+部署完成后，在 Cloudflare Dashboard → Workers → 你的服务 → Settings → Variables and Secrets 中配置环境变量（见下方环境变量表）。
+
+### 第四步：配置定时通知（可选）
+
+在 Cloudflare Dashboard → Workers → 你的服务 → Triggers → Cron Triggers 中添加定时触发器。
+
+> Cloudflare `Cron` 使用 UTC 时间，与北京时间相差 8 小时。  
+> 例如设置为 00:00，则北京时间 08:00 进行通知。
+
+### 同步更新
+
+上游仓库更新后，在你 Fork 的仓库页面点击 **Sync fork** 同步最新代码，Cloudflare 会自动重新构建部署。
+
+---
+
+## 🚀手动部署
 1. 创建 `Workers` 服务，粘贴代码
 2. 创建一个 `KV` 命名空间（名字可自定义）
 3. 绑定 `KV`，变量名称：`DOMAIN_MONITOR`（注意大写）
