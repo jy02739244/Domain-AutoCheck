@@ -1,4 +1,4 @@
-name="domain-check"
+name = "domain-autocheck"
 main="src/index.js"
 
 compatibility_date="2025-09-06"
