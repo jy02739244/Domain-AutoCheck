@@ -329,7 +329,7 @@ async function queryEuCcTcpWhois(domain) {
     const timeoutId = setTimeout(() => {
       timedOut = true;
       reader.cancel();
-    }, 10000);
+    }, 30000);
 
     try {
       while (true) {
@@ -346,7 +346,7 @@ async function queryEuCcTcpWhois(domain) {
     }
 
     if (timedOut && !whoisText) {
-      throw new Error('WHOIS查询超时（10秒）');
+      throw new Error('WHOIS查询超时（30秒）');
     }
 
     if (whoisText.includes('NOT FOUND') || whoisText.includes('No match') || whoisText.includes('Domain not found') || whoisText.includes('No Data Found')) {
