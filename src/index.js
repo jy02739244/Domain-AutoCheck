@@ -235,8 +235,85 @@ async function queryPpUaWhois(domain) {
   }
 }
 
-// eu.cc 域名查询函数 (TCP socket 连接 whois.gname.com)
+// eu.cc 域名查询函数 (用于 eu.cc)
+// 优先使用 RDAP 接口，失败时 fallback 到 TCP WHOIS
 async function queryEuCcWhois(domain) {
+  const rdapResult = await queryEuCcRdap(domain);
+  if (rdapResult.success) return rdapResult;
+  return await queryEuCcTcpWhois(domain);
+}
+
+// eu.cc RDAP 查询：https://rdap.gname.com/domain/{domain}
+async function queryEuCcRdap(domain) {
+  try {
+    const response = await fetch(`https://rdap.gname.com/domain/${encodeURIComponent(domain)}`, {
+      method: 'GET',
+      headers: {
+        'accept': 'application/rdap+json',
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (response.status === 404) {
+      return {
+        success: true,
+        domain: domain,
+        registered: false,
+        raw: null
+      };
+    }
+
+    if (!response.ok) {
+      throw new Error(`RDAP查询失败: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    const getEvent = (action) => {
+      const event = (data.events || []).find(e => e.eventAction === action);
+      return event ? event.eventDate : null;
+    };
+
+    const registrationDate = getEvent('registration');
+    const expiryDate = getEvent('expiration');
+    const lastUpdated = getEvent('last changed') || getEvent('last update of RDAP database');
+
+    let registrar = 'Gname.com';
+    const registrarEntity = (data.entities || []).find(e => (e.roles || []).includes('registrar'));
+    if (registrarEntity && registrarEntity.vcardArray) {
+      const fn = registrarEntity.vcardArray[1].find(f => f[0] === 'fn');
+      if (fn) registrar = fn[3];
+    }
+
+    const nameservers = (data.nameservers || []).map(ns => ns.ldhName).filter(Boolean);
+    const statuses = data.status || [];
+
+    return {
+      success: true,
+      domain: domain,
+      registered: !!registrationDate,
+      registrationDate: registrationDate ? formatDate(registrationDate) : null,
+      expiryDate: expiryDate ? formatDate(expiryDate) : null,
+      lastUpdated: lastUpdated ? formatDate(lastUpdated) : null,
+      registrar: registrar,
+      registrarUrl: 'https://www.gname.com',
+      nameservers: nameservers,
+      status: statuses,
+      dnssec: data.secureDNS ? (data.secureDNS.delegationSigned ? 'signed' : 'unsigned') : null,
+      raw: data
+    };
+  } catch (error) {
+    console.error('eu.cc RDAP查询失败，将尝试WHOIS:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      domain: domain
+    };
+  }
+}
+
+// eu.cc TCP WHOIS 兜底查询：whois -h whois.gname.com "domain"
+async function queryEuCcTcpWhois(domain) {
   try {
     const socket = connect({ hostname: 'whois.gname.com', port: 43 });
 
@@ -313,7 +390,7 @@ async function queryEuCcWhois(domain) {
       registrationDate: createdOn ? formatDate(createdOn) : null,
       expiryDate: expiresOn ? formatDate(expiresOn) : null,
       lastUpdated: updatedOn ? formatDate(updatedOn) : null,
-      registrar: registrar,
+      registrar: registrar || 'Gname.com',
       registrarUrl: 'https://www.gname.com',
       nameservers: nameservers,
       status: statusList,
@@ -321,6 +398,7 @@ async function queryEuCcWhois(domain) {
       raw: whoisText
     };
   } catch (error) {
+    console.error('eu.cc WHOIS兜底查询也失败:', error.message);
     return {
       success: false,
       error: error.message,
