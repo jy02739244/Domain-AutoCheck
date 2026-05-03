@@ -72,6 +72,330 @@ function jsonResponse(data, status = 200) {
   });
 }
 
+// ================================
+// HTML / URL 转义工具
+// ================================
+// 注意：前端 dashboard / setup 页面因为 inline 在 HTML 字符串模板里，
+// 在模板内 inline 了等价实现（搜索 "keep in sync"）。修改这里时记得同步。
+
+// 完整 HTML 转义（5 字符），用于浏览器 DOM 注入防护
+const _HTML_ESCAPE_MAP = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
+export function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/[&<>"']/g, (c) => _HTML_ESCAPE_MAP[c]);
+}
+
+// Telegram parse_mode=HTML 模式专用（只需转义 < > &）
+// Telegram 的 HTML 解析只识别 < > & 三个字符，引号在 plain text 里不会被解释，
+// 保留引号能避免消息显示成 &quot;。
+const _TELEGRAM_ESCAPE_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
+export function escapeHtmlBackend(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/[&<>]/g, (c) => _TELEGRAM_ESCAPE_MAP[c]);
+}
+
+// URL 协议白名单：只放行 http(s):// 和 mailto:。
+// 不合法（含 javascript: / data: / vbscript: / file: / 相对路径 / 协议相对 //）一律返回 ''。
+// 调用方拿到空字符串后应当渲染禁用按钮 / 不渲染 <a>，而不是渲染 href="" 或 href="#"。
+export function safeUrl(value) {
+  if (value === null || value === undefined) return '';
+  const trimmed = String(value).trim();
+  if (!trimmed || trimmed.length > 2048) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^mailto:/i.test(trimmed)) return trimmed;
+  return '';
+}
+
+// ================================
+// 鉴权工具：HMAC 签名 cookie + 恒定时间比较
+// ================================
+//
+// Session cookie 格式：<exp>.<nonce>.<sig>
+//   - exp:   Unix 秒级过期时间
+//   - nonce: 32 字符随机串（hex），区分不同会话
+//   - sig:   HMAC-SHA256(token, "exp.nonce") 的 hex
+//
+// 安全设计：
+//   - 用 token 作为 HMAC 密钥，token 一旦修改，所有老 session 立即失效
+//   - 验证时用恒定时间比较签名，防止时序攻击
+//   - HTTPS 下 Set-Cookie 自动加 Secure，HTTP（本地 dev）下省略
+
+// 注意：这两个常量不能 export——Cloudflare Workers runtime 要求所有 export
+// 必须是 function 或 ExportedHandler，常量 export 会被拒绝（"Incorrect type for map entry"）。
+// 测试里需要这两个值时直接用字面量 'session' / 86400，或通过下面的 getter 函数。
+const SESSION_TTL_SECONDS = 86400; // 24 小时
+const SESSION_COOKIE_NAME = 'session';
+
+// 测试辅助：以函数形式暴露常量（绕过 Workers 的 export 类型限制）
+export function _getSessionCookieName() { return SESSION_COOKIE_NAME; }
+export function _getSessionTtlSeconds() { return SESSION_TTL_SECONDS; }
+
+// 字符串恒定时间比较（防止时序攻击逐字符探测密码 / 签名）
+export function timingSafeEqualStr(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length !== b.length) return false;
+  let r = 0;
+  for (let i = 0; i < a.length; i++) {
+    r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return r === 0;
+}
+
+// HMAC key 缓存：相同 secret 跳过 importKey，命中率近 100%
+const HMAC_KEY_CACHE = new Map();
+
+async function getHmacKey(secret) {
+  let key = HMAC_KEY_CACHE.get(secret);
+  if (key) return key;
+  key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  HMAC_KEY_CACHE.set(secret, key);
+  return key;
+}
+
+// 测试辅助：清空 key 缓存
+export function _resetHmacKeyCache() {
+  HMAC_KEY_CACHE.clear();
+}
+
+// HMAC-SHA256，返回 hex 字符串
+export async function hmacSha256Hex(secret, message) {
+  const key = await getHmacKey(secret);
+  const sig = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    new TextEncoder().encode(message)
+  );
+  const bytes = new Uint8Array(sig);
+  let hex = '';
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i].toString(16).padStart(2, '0');
+  }
+  return hex;
+}
+
+// 用 token 作为密钥签发 session cookie 值
+export async function signSession(token, ttlSec = SESSION_TTL_SECONDS) {
+  const exp = Math.floor(Date.now() / 1000) + ttlSec;
+  const nonce = crypto.randomUUID().replace(/-/g, '');
+  const payload = exp + '.' + nonce;
+  const sig = await hmacSha256Hex(token, payload);
+  return payload + '.' + sig;
+}
+
+// 验证 cookie 中的 session 值是否合法
+export async function verifySession(token, cookieValue) {
+  if (!token || !cookieValue) return false;
+  const parts = cookieValue.split('.');
+  if (parts.length !== 3) return false;
+  const [expStr, nonce, sig] = parts;
+  const exp = Number(expStr);
+  if (!Number.isFinite(exp) || exp < Math.floor(Date.now() / 1000)) return false;
+  if (!nonce || nonce.length < 16) return false;
+  const expected = await hmacSha256Hex(token, expStr + '.' + nonce);
+  return timingSafeEqualStr(sig, expected);
+}
+
+// 从 Cookie header 中解析单个 cookie 的值
+export function readCookie(cookieHeader, name) {
+  if (!cookieHeader) return null;
+  const parts = cookieHeader.split(';');
+  for (const p of parts) {
+    const idx = p.indexOf('=');
+    if (idx === -1) continue;
+    if (p.slice(0, idx).trim() === name) {
+      return p.slice(idx + 1).trim();
+    }
+  }
+  return null;
+}
+
+// 构造 Set-Cookie，HTTPS 下自动加 Secure
+export function buildSessionCookie(value, request, ttlSec = SESSION_TTL_SECONDS) {
+  return _buildCookieString(value, ttlSec, _isHttps(request));
+}
+
+export function buildClearSessionCookie(request) {
+  return _buildCookieString('', 0, _isHttps(request));
+}
+
+function _isHttps(request) {
+  return new URL(request.url).protocol === 'https:';
+}
+
+function _buildCookieString(value, maxAge, secure) {
+  const attrs = [
+    SESSION_COOKIE_NAME + '=' + value,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Strict',
+    'Max-Age=' + maxAge,
+  ];
+  if (secure) attrs.push('Secure');
+  return attrs.join('; ');
+}
+
+// 获取生效的鉴权密码（环境变量 > 代码默认值 > 兜底 'domain'）
+// 兜底到 'domain' 时打印警告——HMAC 用公开默认值当密钥等于裸奔
+let _warnedDefaultToken = false;
+function getCorrectPassword() {
+  if (typeof TOKEN !== 'undefined' && TOKEN) return TOKEN;
+  if (DEFAULT_TOKEN) return DEFAULT_TOKEN;
+  if (!_warnedDefaultToken) {
+    _warnedDefaultToken = true;
+    console.warn(
+      '[security] TOKEN 未设置，正在使用默认密码 "domain"。请尽快设置环境变量 TOKEN，否则 session 签名密钥与源码一致，等同于裸奔。'
+    );
+  }
+  return 'domain';
+}
+
+// ================================
+// 登录频次限制（防暴力破解）
+// ================================
+//
+// 同一 IP 在 15 分钟窗口内最多失败 5 次，超过返回 429。
+//
+// ⚠️ 已知限制 — race condition：
+//   KV 的 read-modify-write 不 atomic（先 get count，再 put count+1）。
+//   分布式并发请求理论上能让计数失真——一定程度上绕过限制。
+//   真正 atomic 频次限制需要 Durable Object（约 100 行增量，TODO）。
+//   当前实现的真实防御等级：能挡住单点暴力（每秒数次的脚本）+ 大幅提高
+//   分布式攻击的成本（攻击者需要协调多 region/IP 才有意义）。
+//
+// ⚠️ KV 不可用时：函数静默 graceful degrade（返回 0 / no-op），
+//   首次发生时打 console.warn 提醒运维。
+//
+// ⚠️ clientIp === 'unknown' 时不计数：
+//   本地 wrangler dev 没有 CF-Connecting-IP，所有请求都是 'unknown'，
+//   如果给 'unknown' 计数会让一次失败影响所有后续访问（共享计数器）。
+//   生产环境（CF 边缘）CF-Connecting-IP 必然存在，不会触发这个分支。
+
+// ⚠️ 不能 export const——Workers runtime 要求 export 必须是 function。测试通过 getter 拿值。
+const MAX_LOGIN_FAILS = 5;
+const LOGIN_FAIL_WINDOW_SECONDS = 900;
+const LOGIN_FAIL_KEY_PREFIX = 'login:fail:';
+
+export function _getMaxLoginFails() { return MAX_LOGIN_FAILS; }
+export function _getLoginFailWindowSeconds() { return LOGIN_FAIL_WINDOW_SECONDS; }
+
+// ⚠️ clientIp 不计数的情况（避免本地 dev 锁全员）：
+//   - 'unknown' / 'localhost'（无任何 IP 头时的兜底）
+//   - 127.0.0.0/8 整个段（IPv4 loopback；wrangler dev 设 cf-connecting-ip: 127.0.0.1）
+//   - '::1' / '0:0:0:0:0:0:0:1'（IPv6 loopback 压缩 / 未压缩）
+//   - '::ffff:127.x.x.x'（IPv4-mapped IPv6 loopback，某些反向代理用）
+//   - '0.0.0.0'（unspecified）
+//   生产 CF 边缘下 CF-Connecting-IP 总是公网 IP，不会触发跳过。
+
+function _shouldSkipRateLimit(ip) {
+  if (!ip) return true;
+  if (ip === 'unknown' || ip === 'localhost') return true;
+  if (ip === '0.0.0.0') return true;
+  // IPv4 loopback 整段 127.0.0.0/8（严格匹配，不接受 '127.evil' 这种非法字面量）
+  if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) return true;
+  // IPv6 loopback：压缩与未压缩
+  if (ip === '::1' || ip === '0:0:0:0:0:0:0:1') return true;
+  // IPv4-mapped IPv6 loopback（含 ::ffff:127.x.x.x，大小写不敏感）
+  if (/^::ffff:127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/i.test(ip)) return true;
+  return false;
+}
+
+// 一次性 warn 状态（不同 isolate 间各自独立，但单个 isolate 内只打一次）
+let _kvUnavailableWarned = false;
+function _warnKvUnavailable() {
+  if (_kvUnavailableWarned) return;
+  _kvUnavailableWarned = true;
+  console.warn('[security] KV 不可用，登录频次限制已 graceful degrade（不再计数）。');
+}
+
+// 测试辅助：重置 warn flag
+export function _resetKvUnavailableWarn() {
+  _kvUnavailableWarned = false;
+}
+
+// 从请求头提取客户端 IP。
+//
+// 信任边界：
+//   - CF-Connecting-IP    Cloudflare 边缘强制设置，**可信**（生产环境总有）
+//   - X-Forwarded-For     可被客户端伪造，**仅 fallback** 兼容本地 wrangler dev
+//   - X-Real-IP           可被客户端伪造，**仅 fallback**
+//   - 'unknown'           本地无任何 IP 头时的兜底
+//
+// 实战影响：CF 部署时永远走第一条；攻击者伪造 X-Forwarded-For 不影响 CF-Connecting-IP。
+//
+// ⚠️ 调用方应通过 _shouldSkipRateLimit() 判断是否跳过限速——除 'unknown' 外，
+// loopback IP（127.0.0.0/8、::1、IPv4-mapped IPv6 loopback、0.0.0.0、localhost）也会被跳过，
+// 避免本地 wrangler dev（设 cf-connecting-ip: 127.0.0.1）锁全员。
+export function getClientIp(request) {
+  return request.headers.get('CF-Connecting-IP')?.trim()
+    || request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim()
+    || request.headers.get('X-Real-IP')?.trim()
+    || 'unknown';
+}
+
+// 读 KV 拿失败计数（KV 缺失或本地/未知 IP 时返回 0）
+export async function getLoginFailCount(kv, ip) {
+  if (!kv) { _warnKvUnavailable(); return 0; }
+  if (_shouldSkipRateLimit(ip)) return 0;
+  const v = await kv.get(LOGIN_FAIL_KEY_PREFIX + ip);
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+// 失败 +1，TTL 重置为窗口长度（KV 缺失或本地/未知 IP 时不计数）
+export async function recordLoginFail(kv, ip) {
+  if (!kv) { _warnKvUnavailable(); return 0; }
+  if (_shouldSkipRateLimit(ip)) return 0;
+  const cur = await getLoginFailCount(kv, ip);
+  const next = cur + 1;
+  await kv.put(LOGIN_FAIL_KEY_PREFIX + ip, String(next), {
+    expirationTtl: LOGIN_FAIL_WINDOW_SECONDS,
+  });
+  return next;
+}
+
+// 成功登录后清除该 IP 的失败计数（KV 缺失或本地/未知 IP 时 no-op）
+export async function clearLoginFail(kv, ip) {
+  if (!kv) { _warnKvUnavailable(); return; }
+  if (_shouldSkipRateLimit(ip)) return;
+  await kv.delete(LOGIN_FAIL_KEY_PREFIX + ip);
+}
+
+// ================================
+// CSRF 软防御：Origin 校验
+// ================================
+// 浏览器发起跨站 fetch 时会带 Origin 头，若与请求的目标 origin 不一致就拒绝。
+// 没有 Origin 头的请求（curl / 部分 API 客户端）放行——SameSite=Strict cookie
+// 已经在浏览器侧挡住了绝大多数 CSRF。
+// 配合 GET 请求放行（CSRF 主要影响 mutating 操作）。
+
+export function isOriginAllowed(request) {
+  const origin = request.headers.get('Origin');
+  if (!origin) return true; // 非浏览器客户端通常不发 Origin
+  try {
+    const reqOrigin = new URL(request.url).origin;
+    return new URL(origin).origin === reqOrigin;
+  } catch {
+    return false;
+  }
+}
+
+// 判断请求是 mutating（需要 CSRF 检查）还是只读（GET / HEAD / OPTIONS 放行）
+export function isMutatingMethod(method) {
+  return method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS';
+}
+
 // 判断域名是否支持WHOIS查询，返回对应的查询函数或null
 function getWhoisQueryFunction(domainName) {
   const lowerDomain = domainName.toLowerCase();
@@ -2903,7 +3227,37 @@ const getHTMLContent = (title) => `
         let currentSortOrder = 'asc'; // 默认排序顺序
         let currentCategoryFilter = 'all'; // 当前分类筛选
         let viewMode = 'auto-collapse'; // 默认查看模式：auto-collapse (自动折叠), expand-all (全部展开), collapse-all (全部折叠)
-        
+
+        // ================================
+        // 安全工具：HTML 转义 + URL 协议白名单
+        // ⚠️ keep in sync with 同文件顶部的 escapeHtml / safeUrl（同时改两处）
+        // 所有 user-supplied 字符串拼进 innerHTML 之前必须经过 escapeHtml；
+        // 凡是放进 href / src 的 URL 必须经过 safeUrl，避免 javascript: / data: 协议执行脚本
+        // ================================
+        const _HTML_ESCAPE_MAP = {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        };
+        function escapeHtml(value) {
+          if (value === null || value === undefined) return '';
+          return String(value).replace(/[&<>"']/g, function(ch) { return _HTML_ESCAPE_MAP[ch]; });
+        }
+        // 协议白名单：只允许 http / https / mailto，其余（含 javascript:、data:、file:、相对路径、空值）返回 ''。
+        // 调用方拿到空字符串后应当渲染禁用按钮，而不是渲染 href="" 或 href="#"。
+        // ⚠️ 注意：此函数 inline 在反引号 HTML 模板里，正则中所有 \X 必须写成 \\X
+        // （JS template literal 会吃掉单个反斜杠）。所以 regex 里写 \\/ 才会输出 \/。
+        function safeUrl(value) {
+          if (value === null || value === undefined) return '';
+          var trimmed = String(value).trim();
+          if (!trimmed || trimmed.length > 2048) return '';
+          if (/^https?:\\/\\//i.test(trimmed)) return trimmed;
+          if (/^mailto:/i.test(trimmed)) return trimmed;
+          return '';
+        }
+
         // 将天数转换为年月日格式
         function formatDaysToYMD(days) {
           if (days <= 0) return '';
@@ -3080,7 +3434,9 @@ const getHTMLContent = (title) => `
                 }
                 
                 // 验证域名格式 - 更宽松的域名格式验证
-                const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
+                // ⚠️ 此正则 inline 在反引号 HTML 模板里，所有 regex 中的 \X 必须写成 \\X
+                // （JS template literal 会吃掉单个反斜杠，导致 \. 变成 . 让正则失效）
+                const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?)*\\.[a-zA-Z]{2,}$/;
                 if (!domainRegex.test(domain)) {
                     showWhoisStatus('域名格式不正确', 'danger');
                     return;
@@ -3877,10 +4233,10 @@ const getHTMLContent = (title) => `
                 // 创建分类标题行
                 const categoryRow = document.createElement('div');
                 categoryRow.className = 'row'; // 移除额外的margin类
-                categoryRow.innerHTML = 
+                categoryRow.innerHTML =
                     '<div class="col-12 px-1-5">' + /* 添加与卡片列相同的内边距类 */
                         '<div class="category-header">' +
-                            '<h5 class="category-title">' + groupName + ' <span class="count-badge">(' + groupDomains.length + ')</span></h5>' +
+                            '<h5 class="category-title">' + escapeHtml(groupName) + ' <span class="count-badge">(' + groupDomains.length + ')</span></h5>' +
                         '</div>' +
                     '</div>';
                 groupContainer.appendChild(categoryRow);
@@ -3921,7 +4277,7 @@ const getHTMLContent = (title) => `
                                 '<i class="iconfont icon-folder-open" style="font-size: 32px; opacity: 0.6; display: block; margin-bottom: 10px;"></i>' +
                                 '<p class="mb-1 small">该分类下暂无域名</p>' +
                                 '<small class="opacity-75" style="display: block; margin-bottom: 15px;">在此分类下添加域名</small>' +
-                                '<button class="btn btn-primary btn-sm add-domain-to-category" data-category-id="' + categoryData.id + '" data-category-name="' + categoryData.name + '">' +
+                                '<button class="btn btn-primary btn-sm add-domain-to-category" data-category-id="' + escapeHtml(categoryData.id) + '" data-category-name="' + escapeHtml(categoryData.name) + '">' +
                                     '<i class="iconfont icon-jia" style="color: white;"></i> <span style="color: white;">添加域名</span>' +
                                 '</button>' +
                             '</div>' +
@@ -4143,37 +4499,47 @@ const getHTMLContent = (title) => `
                     // 生成价格信息HTML
                     let priceHtml = '';
                     if (domain.price && domain.price.value !== null && domain.price.value !== undefined && domain.price.value !== '') {
-                        priceHtml = ' <span class="text-muted">(' + domain.price.currency + domain.price.value + 
-                        '/' + (domain.price.unit === 'year' ? '年' : domain.price.unit === 'month' ? '月' : '日') + 
+                        priceHtml = ' <span class="text-muted">(' + escapeHtml(domain.price.currency) + escapeHtml(domain.price.value) +
+                        '/' + (domain.price.unit === 'year' ? '年' : domain.price.unit === 'month' ? '月' : '日') +
                         ')</span>';
                     }
-                    
+
+                    // 生成续期链接按钮：根据 safeUrl 结果决定渲染 <a> 还是 disabled <button>，
+                    // 不安全协议（javascript:/data:/相对路径等）会被静默拒绝并显示"协议不安全"提示
+                    const safeRenewLink = safeUrl(domain.renewLink);
+                    const renewBtnTitle = !domain.renewLink
+                        ? '未设置续期链接'
+                        : (safeRenewLink ? '前往续期页面' : '续期链接协议不安全（仅支持 http(s) / mailto）');
+                    const renewLinkHtml = safeRenewLink
+                        ? '<a href="' + escapeHtml(safeRenewLink) + '" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-warning" title="' + escapeHtml(renewBtnTitle) + '"><i class="iconfont icon-link"></i> 链接</a>'
+                        : '<button class="btn btn-sm btn-secondary" disabled title="' + escapeHtml(renewBtnTitle) + '"><i class="iconfont icon-link"></i> 链接</button>';
+
                                     const cardHtml = '<div class="card domain-card ' + statusClass + ' mb-2">' +
                 '<div class="card-header">' +
                 '<span class="status-dot ' + statusClass + '"></span>' +
                 '<div class="domain-header">' +
-                (domain.customNote && domain.customNote.trim() !== '' ? 
+                (domain.customNote && domain.customNote.trim() !== '' ?
                     // 有备注时的布局 - 标签在域名下方
                     '<div class="domain-name-container" style="display: flex; flex-direction: column; justify-content: flex-start; height: 100%;">' +
-                    '<h5 class="mb-0 domain-title" style="word-break: break-all;"><span class="domain-text" style="line-height: var(--domain-line-height);">' + domain.name + '</span></h5>' +
+                    '<h5 class="mb-0 domain-title" style="word-break: break-all;"><span class="domain-text" style="line-height: var(--domain-line-height);">' + escapeHtml(domain.name) + '</span></h5>' +
                     '<div class="spacer" style="height: var(--domain-note-spacing);"></div>' +
                     '<div class="domain-meta">' +
-                                                    '<span class="text-info ' + (domain.noteColor || 'tag-blue') + '" style="background-color: ' + 
-                                (domain.noteColor === 'tag-blue' ? '#3B82F6' : 
+                                                    '<span class="text-info ' + escapeHtml(domain.noteColor || 'tag-blue') + '" style="background-color: ' +
+                                (domain.noteColor === 'tag-blue' ? '#3B82F6' :
                                 domain.noteColor === 'tag-green' ? '#10B981' :
-                                domain.noteColor === 'tag-red' ? '#EF4444' : 
+                                domain.noteColor === 'tag-red' ? '#EF4444' :
                                 domain.noteColor === 'tag-yellow' ? '#F59E0B' :
                                 domain.noteColor === 'tag-purple' ? '#8B5CF6' :
                                 domain.noteColor === 'tag-pink' ? '#EC4899' :
                                 domain.noteColor === 'tag-indigo' ? '#6366F1' :
-                                domain.noteColor === 'tag-gray' ? '#6B7280' : '#3B82F6') + 
-                                ' !important">' + domain.customNote + '</span>' +
+                                domain.noteColor === 'tag-gray' ? '#6B7280' : '#3B82F6') +
+                                ' !important">' + escapeHtml(domain.customNote) + '</span>' +
                     '</div>' +
                     '</div>'
-                    : 
+                    :
                     // 无备注时的布局 - 保持与有备注布局相同的结构，只是没有备注标签
                     '<div class="domain-name-container" style="display: flex; flex-direction: column; justify-content: flex-start; height: 100%;">' +
-                    '<h5 class="mb-0 domain-title" style="word-break: break-all;"><span class="domain-text" style="line-height: var(--domain-line-height);">' + domain.name + '</span></h5>' +
+                    '<h5 class="mb-0 domain-title" style="word-break: break-all;"><span class="domain-text" style="line-height: var(--domain-line-height);">' + escapeHtml(domain.name) + '</span></h5>' +
                     '<div class="spacer" style="height: var(--domain-note-spacing);"></div>' +
                     '<div class="domain-meta"></div>' +
                     '</div>'
@@ -4181,39 +4547,37 @@ const getHTMLContent = (title) => `
                 '</div>' +
                         '<div class="domain-status">' +
                         '<span class="badge bg-' + statusBadge + '">' + statusText + '</span>' +
-                        '<button class="btn btn-sm btn-link toggle-details collapsed" data-bs-toggle="collapse" data-bs-target="#details-' + domain.id + '" aria-expanded="false" aria-controls="details-' + domain.id + '">' +
+                        '<button class="btn btn-sm btn-link toggle-details collapsed" data-bs-toggle="collapse" data-bs-target="#details-' + escapeHtml(domain.id) + '" aria-expanded="false" aria-controls="details-' + escapeHtml(domain.id) + '">' +
                         '<span class="toggle-icon-container">' +
                         '<i class="iconfont icon-angle-down toggle-icon"></i>' +
                         '</span>' +
                         '</button>' +
                         '</div>' +
                         '</div>' +
-                        '<div class="collapse" id="details-' + domain.id + '">' +
+                        '<div class="collapse" id="details-' + escapeHtml(domain.id) + '">' +
                         '<div class="card-body pb-2">' +
                         '<div class="d-flex justify-content-between align-items-start mb-2" style="position: relative;">' +
                         '<div class="flex-grow-1" style="padding-right: ' + textPaddingRight + '; min-width: 0;">' +
-                        (domain.registrar ? '<p class="card-text mb-1" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; display: block;"><i class="iconfont icon-house-chimney"></i><strong>注册厂商:</strong> ' + domain.registrar + '</p>' : '') +
-                        (domain.registeredAccount ? '<p class="card-text mb-1" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; display: block;"><i class="iconfont icon-user"></i><strong>注册账号:</strong> ' + domain.registeredAccount + '</p>' : '') +
+                        (domain.registrar ? '<p class="card-text mb-1" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; display: block;"><i class="iconfont icon-house-chimney"></i><strong>注册厂商:</strong> ' + escapeHtml(domain.registrar) + '</p>' : '') +
+                        (domain.registeredAccount ? '<p class="card-text mb-1" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; display: block;"><i class="iconfont icon-user"></i><strong>注册账号:</strong> ' + escapeHtml(domain.registeredAccount) + '</p>' : '') +
                         (domain.registrationDate ? '<p class="card-text mb-1 text-nowrap" style="overflow: hidden; text-overflow: ellipsis;"><i class="iconfont icon-calendar-days"></i><strong>注册时间:</strong>' + formatDate(domain.registrationDate) + '</p>' : '') +
                         '<p class="card-text mb-1 text-nowrap" style="overflow: hidden; text-overflow: ellipsis;"><i class="iconfont icon-rili"></i><strong>到期日期:</strong>' + formatDate(domain.expiryDate) + '</p>' +
-                        '<p class="card-text mb-1 text-nowrap" style="overflow: hidden; text-overflow: ellipsis;"><i class="iconfont icon-repeat"></i><strong>续期周期:</strong>' + 
-                        (domain.renewCycle ? domain.renewCycle.value + ' ' + 
-                        (domain.renewCycle.unit === 'year' ? '年' : 
-                         domain.renewCycle.unit === 'month' ? '月' : '天') : '1 年') + 
+                        '<p class="card-text mb-1 text-nowrap" style="overflow: hidden; text-overflow: ellipsis;"><i class="iconfont icon-repeat"></i><strong>续期周期:</strong>' +
+                        (domain.renewCycle ? escapeHtml(domain.renewCycle.value) + ' ' +
+                        (domain.renewCycle.unit === 'year' ? '年' :
+                         domain.renewCycle.unit === 'month' ? '月' : '天') : '1 年') +
                         priceHtml + '</p>' +
                         '<p class="card-text mb-0 text-nowrap" style="overflow: hidden; text-overflow: ellipsis;"><i class="iconfont icon-hourglass-start"></i><strong>剩余天数:</strong>' + (daysLeft > 0 ? daysLeft + ' 天 <span class="text-muted">(' + formatDaysToYMD(daysLeft) + ')</span>' : '已过期') + '</p>' +
-                        (progressStyle === 'bar' ? progressHtml : '') + 
+                        (progressStyle === 'bar' ? progressHtml : '') +
                         '</div>' +
                         (progressStyle === 'circle' ? progressHtml : '') +
                         '</div>' +
                         (infoHtml ? '<div class="domain-info mb-2">' + infoHtml + '</div>' : '') +
                         '<div class="domain-actions">' +
-                        '<button class="btn btn-sm btn-primary edit-domain" data-id="' + domain.id + '" title="编辑域名"><i class="iconfont icon-pencil"></i> 编辑</button>' +
-                        '<button class="btn btn-sm btn-success renew-domain" data-id="' + domain.id + '" data-name="' + domain.name + '" data-expiry="' + domain.expiryDate + '" title="续期域名"><i class="iconfont icon-arrows-rotate"></i> 续期</button>' +
-                        (domain.renewLink ? 
-                        '<a href="' + domain.renewLink + '" target="_blank" class="btn btn-sm btn-warning" title="前往续期页面"><i class="iconfont icon-link"></i> 链接</a>' : 
-                        '<button class="btn btn-sm btn-secondary" disabled title="未设置续期链接"><i class="iconfont icon-link"></i> 链接</button>') +
-                        '<button class="btn btn-sm btn-danger delete-domain" data-id="' + domain.id + '" data-name="' + domain.name + '" title="删除域名"><i class="iconfont icon-shanchu"></i> 删除</button>' +
+                        '<button class="btn btn-sm btn-primary edit-domain" data-id="' + escapeHtml(domain.id) + '" title="编辑域名"><i class="iconfont icon-pencil"></i> 编辑</button>' +
+                        '<button class="btn btn-sm btn-success renew-domain" data-id="' + escapeHtml(domain.id) + '" data-name="' + escapeHtml(domain.name) + '" data-expiry="' + escapeHtml(domain.expiryDate) + '" title="续期域名"><i class="iconfont icon-arrows-rotate"></i> 续期</button>' +
+                        renewLinkHtml +
+                        '<button class="btn btn-sm btn-danger delete-domain" data-id="' + escapeHtml(domain.id) + '" data-name="' + escapeHtml(domain.name) + '" title="删除域名"><i class="iconfont icon-shanchu"></i> 删除</button>' +
                         '</div>' +
                         '</div>' +
                         '</div>' +
@@ -4844,23 +5208,23 @@ const getHTMLContent = (title) => `
                         const categoryItem = document.createElement('div');
                         categoryItem.className = 'mb-3 p-3 rounded category-item';
                         categoryItem.style.cssText = 'background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.2);';
-                        categoryItem.innerHTML = 
+                        categoryItem.innerHTML =
                             '<div class="d-flex justify-content-between align-items-start">' +
                                 '<div class="flex-grow-1">' +
-                                    '<h6 class="mb-1 fw-bold text-heading">' + category.name + '</h6>' +
-                                    '<small class="text-muted opacity-75">' + (category.description || '无描述') + '</small>' +
+                                    '<h6 class="mb-1 fw-bold text-heading">' + escapeHtml(category.name) + '</h6>' +
+                                    '<small class="text-muted opacity-75">' + escapeHtml(category.description || '无描述') + '</small>' +
                                 '</div>' +
                                 '<div class="d-flex gap-2 ms-3">' +
-                                    '<button type="button" class="btn btn-outline-light move-category-up" data-id="' + category.id + '" ' + (index === 0 ? 'disabled' : '') + ' title="上移" style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 6px; line-height: 1;">' +
+                                    '<button type="button" class="btn btn-outline-light move-category-up" data-id="' + escapeHtml(category.id) + '" ' + (index === 0 ? 'disabled' : '') + ' title="上移" style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 6px; line-height: 1;">' +
                                         '<i class="iconfont icon-shangjiantou1" style="color: white; font-size: 14px; display: block; line-height: 1; margin: 0; vertical-align: middle;"></i>' +
                                     '</button>' +
-                                    '<button type="button" class="btn btn-outline-light move-category-down" data-id="' + category.id + '" ' + (index === userCategories.length - 1 ? 'disabled' : '') + ' title="下移" style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 6px; line-height: 1;">' +
+                                    '<button type="button" class="btn btn-outline-light move-category-down" data-id="' + escapeHtml(category.id) + '" ' + (index === userCategories.length - 1 ? 'disabled' : '') + ' title="下移" style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 6px; line-height: 1;">' +
                                         '<i class="iconfont icon-xiajiantou1" style="color: white; font-size: 14px; display: block; line-height: 1; margin: 0; vertical-align: middle;"></i>' +
                                     '</button>' +
-                                    '<button type="button" class="btn btn-primary edit-category" data-id="' + category.id + '" title="编辑" style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 6px; line-height: 1;">' +
+                                    '<button type="button" class="btn btn-primary edit-category" data-id="' + escapeHtml(category.id) + '" title="编辑" style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 6px; line-height: 1;">' +
                                         '<i class="iconfont icon-pencil" style="color: white; font-size: 14px; display: block; line-height: 1; margin: 0; vertical-align: middle;"></i>' +
                                     '</button>' +
-                                    '<button type="button" class="btn btn-outline-danger delete-category" data-id="' + category.id + '" title="删除" style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 6px; line-height: 1;">' +
+                                    '<button type="button" class="btn btn-outline-danger delete-category" data-id="' + escapeHtml(category.id) + '" title="删除" style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 6px; line-height: 1;">' +
                                         '<i class="iconfont icon-shanchu" style="color: white; font-size: 14px; display: block; line-height: 1; margin: 0; vertical-align: middle;"></i>' +
                                     '</button>' +
                                 '</div>' +
@@ -4971,21 +5335,21 @@ const getHTMLContent = (title) => `
                     const originalContent = targetItem.innerHTML;
                     
                     // 替换为编辑表单
-                    targetItem.innerHTML = 
+                    targetItem.innerHTML =
                         '<div class="p-3 rounded" style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);">' +
                             '<div class="mb-3">' +
                                 '<label class="form-label text-heading small">分类名称</label>' +
-                                '<input type="text" class="form-control form-control-sm" id="editName_' + categoryId + '" value="' + category.name.replace(/"/g, '&quot;') + '" maxlength="50">' +
+                                '<input type="text" class="form-control form-control-sm" id="editName_' + escapeHtml(categoryId) + '" value="' + escapeHtml(category.name) + '" maxlength="50">' +
                             '</div>' +
                             '<div class="mb-3">' +
                                 '<label class="form-label text-heading small">描述</label>' +
-                                '<input type="text" class="form-control form-control-sm" id="editDesc_' + categoryId + '" value="' + (category.description || '').replace(/"/g, '&quot;') + '" maxlength="100">' +
+                                '<input type="text" class="form-control form-control-sm" id="editDesc_' + escapeHtml(categoryId) + '" value="' + escapeHtml(category.description || '') + '" maxlength="100">' +
                             '</div>' +
                             '<div class="d-flex gap-2">' +
-                                '<button type="button" class="btn btn-success btn-sm save-edit" data-id="' + categoryId + '">' +
+                                '<button type="button" class="btn btn-success btn-sm save-edit" data-id="' + escapeHtml(categoryId) + '">' +
                                     '<i class="iconfont icon-check" style="color: white;"></i> <span style="color: white;">保存</span>' +
                                 '</button>' +
-                                '<button type="button" class="btn btn-secondary btn-sm cancel-edit" data-id="' + categoryId + '">' +
+                                '<button type="button" class="btn btn-secondary btn-sm cancel-edit" data-id="' + escapeHtml(categoryId) + '">' +
                                     '<i class="iconfont icon-xmark" style="color: white;"></i> <span style="color: white;">取消</span>' +
                                 '</button>' +
                             '</div>' +
@@ -5114,7 +5478,7 @@ const getHTMLContent = (title) => `
                     const statusDiv = document.getElementById('whoisQueryStatus');
                     statusDiv.style.display = 'block';
                     statusDiv.className = 'alert alert-' + type + ' py-2';
-                    statusDiv.innerHTML = '<i class="iconfont icon-' + (type === 'info' ? 'loading' : type === 'success' ? 'check-circle' : 'exclamation-circle') + '"></i> ' + message;
+                    statusDiv.innerHTML = '<i class="iconfont icon-' + (type === 'info' ? 'loading' : type === 'success' ? 'check-circle' : 'exclamation-circle') + '"></i> ' + escapeHtml(message);
                     
                     // 3秒后自动隐藏非错误消息
                     if (type !== 'danger') {
@@ -5359,7 +5723,7 @@ const getHTMLContent = (title) => `
                             break;
                     }
                     
-                    alertDiv.innerHTML = '<i class="iconfont ' + iconClass + '"></i> ' + message +
+                    alertDiv.innerHTML = '<i class="iconfont ' + iconClass + '"></i> ' + escapeHtml(message) +
                         '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
                     document.body.appendChild(alertDiv);
                     
@@ -5467,35 +5831,57 @@ async function handleRequest(request) {
 
   // 获取正确的密码
   // 优先级：环境变量 > 代码变量 > 默认密码'domain'
-  let correctPassword = 'domain';
-  if (typeof TOKEN !== 'undefined' && TOKEN) {
-    correctPassword = TOKEN;
-  } else if (DEFAULT_TOKEN) {
-    correctPassword = DEFAULT_TOKEN;
-  }
+  const correctPassword = getCorrectPassword();
 
-  // 检查是否已经登录（通过cookie）
+  // 检查是否已经登录（HMAC 签名 cookie 校验）
   const cookieHeader = request.headers.get('Cookie') || '';
-  const isAuthenticated = cookieHeader.includes('auth=true');
-  
+  const sessionCookie = readCookie(cookieHeader, SESSION_COOKIE_NAME);
+  const isAuthenticated = await verifySession(correctPassword, sessionCookie);
+
   // 处理登录POST请求
   if (path === '/login' && request.method === 'POST') {
+    // 频次限制：同一 IP 失败 ≥ MAX_LOGIN_FAILS 次直接拒绝
+    const clientIp = getClientIp(request);
+    const kv = typeof DOMAIN_MONITOR !== 'undefined' ? DOMAIN_MONITOR : null;
+    const failCount = await getLoginFailCount(kv, clientIp);
+    if (failCount >= MAX_LOGIN_FAILS) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: `登录失败次数过多，请 ${Math.ceil(LOGIN_FAIL_WINDOW_SECONDS / 60)} 分钟后再试`,
+      }), {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': String(LOGIN_FAIL_WINDOW_SECONDS),
+        },
+      });
+    }
+
     try {
       const requestData = await request.json();
-      const submittedPassword = requestData.password;
-      
-      if (submittedPassword === correctPassword) {
-        // 密码正确，设置cookie并重定向到dashboard
+      const submittedPassword = String(requestData.password ?? '');
+
+      if (timingSafeEqualStr(submittedPassword, correctPassword)) {
+        // 密码正确：清除失败计数 + 签发签名 session cookie
+        await clearLoginFail(kv, clientIp);
+        const sessionValue = await signSession(correctPassword);
         return new Response(JSON.stringify({ success: true }), {
           status: 200,
           headers: {
             'Content-Type': 'application/json',
-            'Set-Cookie': 'auth=true; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400', // 24小时过期
+            'Set-Cookie': buildSessionCookie(sessionValue, request),
           },
         });
       } else {
-        // 密码错误
-        return new Response(JSON.stringify({ success: false, error: '密码错误' }), {
+        // 密码错误：失败计数 +1
+        const newCount = await recordLoginFail(kv, clientIp);
+        const remaining = Math.max(0, MAX_LOGIN_FAILS - newCount);
+        return new Response(JSON.stringify({
+          success: false,
+          error: remaining > 0
+            ? `密码错误（剩余尝试次数 ${remaining}）`
+            : '密码错误，已达失败上限',
+        }), {
           status: 401,
           headers: {
             'Content-Type': 'application/json',
@@ -5511,7 +5897,7 @@ async function handleRequest(request) {
       });
     }
   }
-  
+
   // 处理dashboard页面请求
   if (path === '/dashboard') {
     if (isAuthenticated) {
@@ -5522,21 +5908,21 @@ async function handleRequest(request) {
           'Content-Type': 'text/html;charset=UTF-8',
         },
       });
-      
+
       return await addFooterToResponse(response);
     } else {
       // 未登录，重定向到登录页面
       return Response.redirect(url.origin, 302);
     }
   }
-  
+
   // 登出功能
   if (path === '/logout') {
     return new Response('登出成功', {
       status: 302,
       headers: {
         'Location': '/',
-        'Set-Cookie': 'auth=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0', // 清除cookie
+        'Set-Cookie': buildClearSessionCookie(request),
       },
     });
   }
@@ -5562,7 +5948,14 @@ async function handleRequest(request) {
     if (!isAuthenticated) {
       return jsonResponse({ error: '未授权访问', success: false }, 401);
     }
-    
+
+    // CSRF 软防御：mutating 请求若带 Origin 头必须同源
+    // GET/HEAD/OPTIONS 放行（仅影响 mutating 操作）；
+    // 没有 Origin 头的请求放行（curl/Postman 等非浏览器客户端）
+    if (isMutatingMethod(request.method) && !isOriginAllowed(request)) {
+      return jsonResponse({ error: '跨站请求被拒绝（Origin 不匹配）', success: false }, 403);
+    }
+
     return await handleApiRequest(request);
   }
   
@@ -5834,13 +6227,8 @@ async function checkSetupStatus() {
     }
     
     // 获取正确的密码配置
-    let correctPassword = 'domain';
-    if (typeof TOKEN !== 'undefined' && TOKEN) {
-      correctPassword = TOKEN;
-    } else if (DEFAULT_TOKEN) {
-      correctPassword = DEFAULT_TOKEN;
-    }
-    
+    const correctPassword = getCorrectPassword();
+
     // 检查是否需要认证（域名监控系统默认需要认证）
     const authRequired = true;
     
@@ -5896,6 +6284,37 @@ async function getDomains() {
   return domains;
 }
 
+// ================================
+// 域名字段类型收窄（深度防御 XSS：在写入 KV 前就把异常类型 / 恶意字符串挡掉）
+// ================================
+
+// 收窄 renewCycle，确保 value 是正数、unit 是受信枚举
+export function sanitizeRenewCycle(renewCycle) {
+  if (!renewCycle || typeof renewCycle !== 'object') return null;
+  const value = Number(renewCycle.value);
+  if (!Number.isFinite(value) || value <= 0 || value > 9999) return null;
+  const unit = ['year', 'month', 'day'].includes(renewCycle.unit) ? renewCycle.unit : 'year';
+  return { value, unit };
+}
+
+// 收窄 price，未填价格用空串表达；填了的话 value 必须是非负数字
+export function sanitizePrice(price) {
+  if (price === null || price === undefined) return price; // 保留 null/undefined 语义（updateDomain 用来"不更新"）
+  if (typeof price !== 'object') return null;
+  const raw = price.value;
+  if (raw === '' || raw === null || raw === undefined) {
+    return { value: '', currency: '', unit: 'year' };
+  }
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) return null;
+  // currency 限制长度并剔除 HTML 危险字符（前端虽已 escape，后端再加一层防御）
+  const currency = typeof price.currency === 'string'
+    ? price.currency.replace(/[<>"'&]/g, '').slice(0, 5)
+    : '';
+  const unit = ['year', 'month', 'day'].includes(price.unit) ? price.unit : 'year';
+  return { value, currency, unit };
+}
+
 // 添加新域名
 async function addDomain(domainData) {
   const domains = await getDomains();
@@ -5907,10 +6326,16 @@ async function addDomain(domainData) {
   
   // 生成唯一ID
   domainData.id = crypto.randomUUID();
-  
+
   // 添加创建时间
   domainData.createdAt = new Date().toISOString();
-  
+
+  // 类型收窄（防御性：拒绝异常类型 / 把恶意字符串归一化）
+  domainData.renewCycle = sanitizeRenewCycle(domainData.renewCycle);
+  if (domainData.price !== undefined) {
+    domainData.price = sanitizePrice(domainData.price);
+  }
+
   // 处理通知设置
   if (!domainData.notifySettings) {
     // 添加默认通知设置
@@ -5967,7 +6392,14 @@ async function updateDomain(id, domainData) {
     };
   }
   
-  // 更新域名 - 确保正确处理空值
+  // 更新域名 - 确保正确处理空值（先做类型收窄，再合并）
+  const sanitizedRenewCycle = domainData.renewCycle !== undefined
+    ? sanitizeRenewCycle(domainData.renewCycle)
+    : domains[index].renewCycle;
+  const sanitizedPrice = domainData.price !== undefined
+    ? sanitizePrice(domainData.price)
+    : domains[index].price;
+
   domains[index] = {
     ...domains[index],
     name: domainData.name,
@@ -5979,8 +6411,8 @@ async function updateDomain(id, domainData) {
     customNote: domainData.customNote !== undefined ? domainData.customNote : domains[index].customNote, // 正确处理空字符串
     noteColor: domainData.noteColor !== undefined ? domainData.noteColor : domains[index].noteColor, // 添加备注颜色处理
     renewLink: domainData.renewLink !== undefined ? domainData.renewLink : domains[index].renewLink, // 正确处理空字符串
-    renewCycle: domainData.renewCycle || domains[index].renewCycle,
-    price: domainData.price !== undefined ? domainData.price : domains[index].price, // 添加价格信息，保留现有价格如果未提供
+    renewCycle: sanitizedRenewCycle,
+    price: sanitizedPrice,
     lastRenewed: domainData.lastRenewed !== undefined ? domainData.lastRenewed : domains[index].lastRenewed, // 根据用户选择更新续期时间
     notifySettings: notifySettings,
     updatedAt: new Date().toISOString()
@@ -6644,19 +7076,19 @@ async function sendExpiringDomainsNotification(config, domains, isExpired) {
       message += '\n' + domainSeparator + '\n\n';
     }
     
-    message += '🌍 <b>域名:</b> ' + domain.name + '\n';
+    message += '🌍 <b>域名:</b> ' + escapeHtmlBackend(domain.name) + '\n';
     if (domain.registrar) {
-      message += '🏬 <b>注册厂商:</b> ' + domain.registrar + '\n';
+      message += '🏬 <b>注册厂商:</b> ' + escapeHtmlBackend(domain.registrar) + '\n';
     }
     if (domain.registeredAccount) {
-      message += '👤 <b>注册账号:</b> ' + domain.registeredAccount + '\n';
+      message += '👤 <b>注册账号:</b> ' + escapeHtmlBackend(domain.registeredAccount) + '\n';
     }
 
     message += '⏳ <b>剩余时间:</b> ' + daysLeft + ' 天\n';
     message += '📅 <b>到期日期:</b> ' + formatDate(domain.expiryDate) + '\n';
-    
+
     if (domain.renewLink) {
-      message += '⚠️ <b>点击续期:</b> ' + domain.renewLink + '\n';
+      message += '⚠️ <b>点击续期:</b> ' + escapeHtmlBackend(domain.renewLink) + '\n';
     } else {
       message += '⚠️ <b>点击续期:</b> 未设置续期链接\n';
     }
@@ -6688,57 +7120,57 @@ async function sendCombinedDomainsNotification(config, expiringDomains, expiredD
         message += '\n';
       }
       
-      message += '🌍 域名: ' + domain.name + '\n';
+      message += '🌍 域名: ' + escapeHtmlBackend(domain.name) + '\n';
       if (domain.registrar) {
-        message += '🏬 注册厂商: ' + domain.registrar + '\n';
+        message += '🏬 注册厂商: ' + escapeHtmlBackend(domain.registrar) + '\n';
       }
       if (domain.registeredAccount) {
-        message += '👤 注册账号: ' + domain.registeredAccount + '\n';
+        message += '👤 注册账号: ' + escapeHtmlBackend(domain.registeredAccount) + '\n';
     }
       message += '⏳ 剩余时间: ' + daysLeft + ' 天\n';
       message += '📅 到期日期: ' + formatDate(domain.expiryDate) + '\n';
-      
+
       if (domain.renewLink) {
-        message += '⚠️ 点击续期: ' + domain.renewLink + '\n';
+        message += '⚠️ 点击续期: ' + escapeHtmlBackend(domain.renewLink) + '\n';
       } else {
         message += '⚠️ 点击续期: 未设置续期链接\n';
       }
     });
   }
-  
+
   // 如果两种类型的域名都存在，添加分隔线
   if (expiringDomains.length > 0 && expiredDomains.length > 0) {
     message += '\n━━━━━━━━━━━━━━━━\n\n';
   }
-  
+
   // 处理已过期的域名
   if (expiredDomains.length > 0) {
     const title = '🚫 <b>域名已过期提醒</b> 🚫';
     const separator = '=====================';
-    
+
     message += title + '\n' + separator + '\n\n';
-    
+
     expiredDomains.forEach((domain, index) => {
       const expiryDate = new Date(domain.expiryDate);
       const today = new Date();
       const daysLeft = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      
+
       if (index > 0) {
         message += '\n';
       }
-      
-      message += '🌍 域名: ' + domain.name + '\n';
+
+      message += '🌍 域名: ' + escapeHtmlBackend(domain.name) + '\n';
       if (domain.registrar) {
-        message += '🏬 注册厂商: ' + domain.registrar + '\n';
+        message += '🏬 注册厂商: ' + escapeHtmlBackend(domain.registrar) + '\n';
       }
       if (domain.registeredAccount) {
-        message += '👤 注册账号: ' + domain.registeredAccount + '\n';
+        message += '👤 注册账号: ' + escapeHtmlBackend(domain.registeredAccount) + '\n';
       }
       message += '⏳ 剩余时间: ' + daysLeft + ' 天\n';
       message += '📅 到期日期: ' + formatDate(domain.expiryDate) + '\n';
-      
+
       if (domain.renewLink) {
-        message += '⚠️ 点击续期: ' + domain.renewLink + '\n';
+        message += '⚠️ 点击续期: ' + escapeHtmlBackend(domain.renewLink) + '\n';
       } else {
         message += '⚠️ 点击续期: 未设置续期链接\n';
       }
@@ -6763,12 +7195,12 @@ async function sendDateUpdatedNotification(config, updatedDomains) {
       message += '\n';
     }
     
-    message += '🌍 域名: ' + domain.name + '\n';
+    message += '🌍 域名: ' + escapeHtmlBackend(domain.name) + '\n';
     if (domain.registrar) {
-      message += '🏬 注册厂商: ' + domain.registrar + '\n';
+      message += '🏬 注册厂商: ' + escapeHtmlBackend(domain.registrar) + '\n';
     }
     if (domain.registeredAccount) {
-      message += '👤 注册账号: ' + domain.registeredAccount + '\n';
+      message += '👤 注册账号: ' + escapeHtmlBackend(domain.registeredAccount) + '\n';
     }
     message += '📅 原到期日期: ' + formatDate(domain.oldExpiryDate) + '\n';
     message += '📅 新到期日期: ' + formatDate(domain.newExpiryDate) + '\n';
@@ -7266,26 +7698,35 @@ function getSetupHTML() {
     </div>
     
     <script>
+        // 简易 HTML 转义（setup 页面独立 inline script）
+        // ⚠️ keep in sync with 同文件顶部的 escapeHtml
+        function _setupEscapeHtml(v) {
+            if (v === null || v === undefined) return '';
+            return String(v).replace(/[&<>"']/g, function(c) {
+                return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+            });
+        }
+
         async function checkConfiguration() {
             const button = document.querySelector('.check-button');
             const statusDiv = document.getElementById('statusMessage');
-            
+
             // 设置加载状态
             button.disabled = true;
             button.innerHTML = '<span class="loading-spinner"></span>检测配置中...';
-            
+
             statusDiv.className = 'status-message status-loading';
             statusDiv.style.display = 'block';
             statusDiv.textContent = '正在检测配置状态...';
-            
+
             try {
                 const response = await fetch('/api/check-setup');
                 const result = await response.json();
-                
+
                 if (result.success) {
                     statusDiv.className = 'status-message status-success';
-                    statusDiv.innerHTML = '<i class="iconfont icon-check"></i>' + result.message + '，即将跳转...';
-                    
+                    statusDiv.innerHTML = '<i class="iconfont icon-check"></i>' + _setupEscapeHtml(result.message) + '，即将跳转...';
+
                     // 根据配置状态决定跳转目标
                     setTimeout(() => {
                         if (result.nextStep === 'dashboard') {
@@ -7298,19 +7739,19 @@ function getSetupHTML() {
                     }, 1500);
                 } else {
                     statusDiv.className = 'status-message status-error';
-                    let errorMessage = '<i class="iconfont icon-close"></i>' + result.message;
+                    let errorMessage = '<i class="iconfont icon-close"></i>' + _setupEscapeHtml(result.message);
                     if (result.details) {
-                        errorMessage += '<br><small>详细信息: ' + result.details + '</small>';
+                        errorMessage += '<br><small>详细信息: ' + _setupEscapeHtml(result.details) + '</small>';
                     }
                     statusDiv.innerHTML = errorMessage;
-                    
+
                     // 重置按钮
                     button.disabled = false;
                     button.innerHTML = '<i class="iconfont icon-refresh"></i>重新检测';
                 }
             } catch (error) {
                 statusDiv.className = 'status-message status-error';
-                statusDiv.innerHTML = '<i class="iconfont icon-close"></i>检测失败: ' + error.message;
+                statusDiv.innerHTML = '<i class="iconfont icon-close"></i>检测失败: ' + _setupEscapeHtml(error.message);
                 
                 // 重置按钮
                 button.disabled = false;
