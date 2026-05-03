@@ -81,6 +81,10 @@ function getWhoisQueryFunction(domainName) {
   if (lowerDomain.endsWith('.pp.ua')) {
     return queryPpUaWhois;
   }
+  // eu.cc 二级域名
+  if (lowerDomain.endsWith('.eu.cc')) {
+    return queryEuCcWhois;
+  }
   // DigitalPlat 二级域名
   if (lowerDomain.endsWith('.qzz.io') || lowerDomain.endsWith('.dpdns.org') ||
       lowerDomain.endsWith('.us.kg') || lowerDomain.endsWith('.xx.kg')) {
@@ -220,6 +224,100 @@ async function queryPpUaWhois(domain) {
       nameservers: nameservers,
       status: parseField(/Status:\s*(.+)/i) ? [parseField(/Status:\s*(.+)/i)] : [],
       dnssec: null,
+      raw: whoisText
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+      domain: domain
+    };
+  }
+}
+
+// eu.cc 域名查询函数 (TCP socket 连接 whois.gname.com)
+async function queryEuCcWhois(domain) {
+  try {
+    const socket = connect({ hostname: 'whois.gname.com', port: 43 });
+
+    const writer = socket.writable.getWriter();
+    const encoder = new TextEncoder();
+    await writer.write(encoder.encode(domain + '\r\n'));
+    writer.releaseLock();
+
+    const reader = socket.readable.getReader();
+    const decoder = new TextDecoder();
+    let whoisText = '';
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      reader.cancel();
+    }, 10000);
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        whoisText += decoder.decode(value, { stream: true });
+      }
+      whoisText += decoder.decode();
+    } catch (readError) {
+      if (!timedOut) throw readError;
+    } finally {
+      clearTimeout(timeoutId);
+      socket.close();
+    }
+
+    if (timedOut && !whoisText) {
+      throw new Error('WHOIS查询超时（10秒）');
+    }
+
+    if (whoisText.includes('NOT FOUND') || whoisText.includes('No match') || whoisText.includes('Domain not found') || whoisText.includes('No Data Found')) {
+      return {
+        success: true,
+        domain: domain,
+        registered: false,
+        raw: whoisText
+      };
+    }
+
+    const parseField = (regex) => {
+      const match = whoisText.match(regex);
+      return match ? match[1].trim() : null;
+    };
+
+    const createdOn = parseField(/Creation Date:\s*(.+)/i);
+    const expiresOn = parseField(/Registrar Registration Expiration Date:\s*(.+)/i);
+    const updatedOn = parseField(/Updated Date:\s*(.+)/i);
+    const registrar = parseField(/Registrar:\s*(.+)/i);
+
+    const nameservers = [];
+    const nsRegex = /Name Server:\s*(.+)/gi;
+    let match;
+    while ((match = nsRegex.exec(whoisText)) !== null) {
+      nameservers.push(match[1].trim());
+    }
+
+    const statusList = [];
+    const statusRegex = /Domain Status:\s*(.+)/gi;
+    while ((match = statusRegex.exec(whoisText)) !== null) {
+      statusList.push(match[1].trim());
+    }
+
+    const dnssec = parseField(/DNSSEC:\s*(.+)/i);
+
+    return {
+      success: true,
+      domain: domain,
+      registered: !!createdOn,
+      registrationDate: createdOn ? formatDate(createdOn) : null,
+      expiryDate: expiresOn ? formatDate(expiresOn) : null,
+      lastUpdated: updatedOn ? formatDate(updatedOn) : null,
+      registrar: registrar,
+      registrarUrl: 'https://www.gname.com',
+      nameservers: nameservers,
+      status: statusList,
+      dnssec: dnssec,
       raw: whoisText
     };
   } catch (error) {
@@ -2914,9 +3012,10 @@ const getHTMLContent = (title) => `
                 const dotCount = domain.split('.').length - 1;
                 const lowerDomain = domain.toLowerCase();
                 const isPpUa = lowerDomain.endsWith('.pp.ua');
+                const isEuCc = lowerDomain.endsWith('.eu.cc');
                 const isDigitalPlat = lowerDomain.endsWith('.qzz.io') || lowerDomain.endsWith('.dpdns.org') || lowerDomain.endsWith('.us.kg') || lowerDomain.endsWith('.xx.kg');
-                
-                if (dotCount !== 1 && !((isPpUa || isDigitalPlat) && dotCount === 2)) {
+
+                if (dotCount !== 1 && !((isPpUa || isEuCc || isDigitalPlat) && dotCount === 2)) {
                     if (dotCount === 0) {
                         showWhoisStatus('请输入完整的域名（如：example.com）', 'danger');
                     } else {
@@ -5029,6 +5128,8 @@ const getHTMLContent = (title) => `
                     // 针对特定域名强制设置注册商名称
                     if (domainName.endsWith('.pp.ua')) {
                         registrarName = 'NIC.UA';
+                    } else if (domainName.endsWith('.eu.cc')) {
+                        registrarName = 'Gname.com';
                     } else if (domainName.endsWith('.qzz.io') || domainName.endsWith('.dpdns.org') || domainName.endsWith('.us.kg') || domainName.endsWith('.xx.kg')) {
                         registrarName = 'DigitalPlat.org';
                     }
@@ -5047,6 +5148,10 @@ const getHTMLContent = (title) => `
                     if (!renewLinkField.value) {
                         if (domainName.endsWith('.pp.ua')) {
                             renewLinkField.value = 'https://nic.ua/en/my/domains';
+                            renewLinkField.classList.add('auto-filled');
+                            filledFields.push('续费链接');
+                        } else if (domainName.endsWith('.eu.cc')) {
+                            renewLinkField.value = 'https://www.gname.com/user';
                             renewLinkField.classList.add('auto-filled');
                             filledFields.push('续费链接');
                         } else if (domainName.endsWith('.qzz.io') || domainName.endsWith('.dpdns.org') || domainName.endsWith('.us.kg') || domainName.endsWith('.xx.kg')) {
@@ -5567,9 +5672,10 @@ async function handleApiRequest(request) {
       const dotCount = domain.split('.').length - 1;
       const lowerDomain = domain.toLowerCase();
       const isPpUa = lowerDomain.endsWith('.pp.ua');
+      const isEuCc = lowerDomain.endsWith('.eu.cc');
       const isDigitalPlat = lowerDomain.endsWith('.qzz.io') || lowerDomain.endsWith('.dpdns.org') || lowerDomain.endsWith('.us.kg') || lowerDomain.endsWith('.xx.kg');
-      
-      if (dotCount !== 1 && !((isPpUa || isDigitalPlat) && dotCount === 2)) {
+
+      if (dotCount !== 1 && !((isPpUa || isEuCc || isDigitalPlat) && dotCount === 2)) {
         if (dotCount === 0) {
           return jsonResponse({ error: '请输入完整的域名（如：example.com）' }, 400);
         } else {
@@ -5581,6 +5687,9 @@ async function handleApiRequest(request) {
       if (isPpUa) {
         // 使用专门的 nic.ua 接口查询 pp.ua 域名
         result = await queryPpUaWhois(domain);
+      } else if (isEuCc) {
+        // 使用 gname.com WHOIS 查询 eu.cc 域名
+        result = await queryEuCcWhois(domain);
       } else if (isDigitalPlat) {
         // 使用 DigitalPlat 接口查询特定二级域名
         result = await queryDigitalPlatWhois(domain);
