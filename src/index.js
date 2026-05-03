@@ -232,21 +232,92 @@ async function queryPpUaWhois(domain) {
 }
 
 // DigitalPlat 域名查询函数 (用于 qzz.io, dpdns.org, us.kg, xx.kg)
-// 通过 TCP socket 直连 WHOIS 服务器查询，等同于: whois -h whois.digitalplat.org "domain"
+// 优先使用 RDAP 接口，失败时 fallback 到 TCP WHOIS
 async function queryDigitalPlatWhois(domain) {
+  const rdapResult = await queryDigitalPlatRdap(domain);
+  if (rdapResult.success) return rdapResult;
+  return await queryDigitalPlatTcpWhois(domain);
+}
+
+// DigitalPlat RDAP 查询：https://rdap.digitalplat.org/domain/{domain}
+async function queryDigitalPlatRdap(domain) {
   try {
-    // 连接 DigitalPlat WHOIS 服务器（TCP 端口 43，明文）
-    // connect 来自顶层 import { connect } from 'cloudflare:sockets'
+    const response = await fetch(`https://rdap.digitalplat.org/domain/${encodeURIComponent(domain)}`, {
+      method: 'GET',
+      headers: {
+        'accept': 'application/rdap+json',
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (response.status === 404) {
+      return {
+        success: true,
+        domain: domain,
+        registered: false,
+        raw: null
+      };
+    }
+
+    if (!response.ok) {
+      throw new Error(`RDAP查询失败: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    const getEvent = (action) => {
+      const event = (data.events || []).find(e => e.eventAction === action);
+      return event ? event.eventDate : null;
+    };
+
+    const registrationDate = getEvent('registration');
+    const expiryDate = getEvent('expiration');
+    const lastUpdated = getEvent('last changed');
+
+    let registrar = 'DigitalPlat';
+    const registrarEntity = (data.entities || []).find(e => (e.roles || []).includes('registrar'));
+    if (registrarEntity && registrarEntity.vcardArray) {
+      const fn = registrarEntity.vcardArray[1].find(f => f[0] === 'fn');
+      if (fn) registrar = fn[3];
+    }
+
+    const nameservers = (data.nameservers || []).map(ns => ns.ldhName).filter(Boolean);
+    const statuses = data.status || [];
+
+    return {
+      success: true,
+      domain: domain,
+      registered: !!registrationDate,
+      registrationDate: registrationDate ? formatDate(registrationDate) : null,
+      expiryDate: expiryDate ? formatDate(expiryDate) : null,
+      lastUpdated: lastUpdated ? formatDate(lastUpdated) : null,
+      registrar: registrar,
+      registrarUrl: 'https://domain.digitalplat.org',
+      nameservers: nameservers,
+      status: statuses,
+      dnssec: null,
+      raw: data
+    };
+  } catch (error) {
+    console.error('RDAP查询失败，将尝试WHOIS:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      domain: domain
+    };
+  }
+}
+
+// DigitalPlat TCP WHOIS 兜底查询：whois -h whois.digitalplat.org "domain"
+async function queryDigitalPlatTcpWhois(domain) {
+  try {
     const socket = connect({ hostname: 'whois.digitalplat.org', port: 43 });
 
-    // 发送 WHOIS 查询（协议格式：域名 + \r\n）
     const writer = socket.writable.getWriter();
     const encoder = new TextEncoder();
     await writer.write(encoder.encode(domain + '\r\n'));
-    // 释放 writer 锁而非关闭，避免生产环境中 close() 导致整个 socket 被关闭
     writer.releaseLock();
 
-    // 读取完整响应，带 10 秒超时保护
     const reader = socket.readable.getReader();
     const decoder = new TextDecoder();
     let whoisText = '';
@@ -262,14 +333,11 @@ async function queryDigitalPlatWhois(domain) {
         if (done) break;
         whoisText += decoder.decode(value, { stream: true });
       }
-      // 刷新 decoder 中可能残留的字节
       whoisText += decoder.decode();
     } catch (readError) {
-      // reader.cancel() from timeout causes "Stream was cancelled" — handle gracefully
       if (!timedOut) throw readError;
     } finally {
       clearTimeout(timeoutId);
-      // 确保 socket 被正确关闭
       socket.close();
     }
 
@@ -277,7 +345,6 @@ async function queryDigitalPlatWhois(domain) {
       throw new Error('WHOIS查询超时（10秒）');
     }
 
-    // 检查是否未找到域名
     if (whoisText.includes('Domain not found') || whoisText.includes('No match') || whoisText.includes('NOT FOUND')) {
       return {
         success: true,
@@ -287,20 +354,17 @@ async function queryDigitalPlatWhois(domain) {
       };
     }
 
-    // 解析 WHOIS 文本
     const parseField = (regex) => {
       const match = whoisText.match(regex);
       return match ? match[1].trim() : null;
     };
 
-    // 适配不同的日期格式
     const createdOn = parseField(/Creation Date:\s*(.+)/i);
     const expiresOn = parseField(/Registry Expiry Date:\s*(.+)/i);
     const updatedOn = parseField(/Updated Date:\s*(.+)/i);
     const registrar = parseField(/Registrar:\s*(.+)/i);
     const registrarUrl = parseField(/Registrar URL:\s*(.+)/i);
 
-    // 提取 Nameservers（可能有多行）
     const nameservers = [];
     const nsRegex = /Name Server:\s*(.+)/gi;
     let nsMatch;
@@ -309,7 +373,6 @@ async function queryDigitalPlatWhois(domain) {
       if (ns) nameservers.push(ns);
     }
 
-    // 提取所有 Domain Status（可能有多行）
     const statuses = [];
     const statusRegex = /Domain Status:\s*(.+)/gi;
     let statusMatch;
@@ -330,10 +393,10 @@ async function queryDigitalPlatWhois(domain) {
       nameservers: nameservers,
       status: statuses,
       dnssec: null,
-      raw: whoisText // 保存原始 WHOIS 文本
+      raw: whoisText
     };
   } catch (error) {
-    console.error(error);
+    console.error('WHOIS兜底查询也失败:', error.message);
     return {
       success: false,
       error: error.message,
