@@ -145,32 +145,52 @@ async function queryDomainWhois(domain) {
   }
 }
 
-// PP.UA 域名查询函数 (使用 nic.ua 接口)
+// PP.UA 域名查询函数 (通过 TCP socket 直连 whois.pp.ua)
 async function queryPpUaWhois(domain) {
   try {
-    const response = await fetch(`https://nic.ua/en/whois-info?domain_name=${encodeURIComponent(domain)}`, {
-      method: 'GET',
-      headers: {
-        'accept': '*/*',
-        'accept-language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
-        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
-        'x-requested-with': 'XMLHttpRequest'
+    const socket = connect({ hostname: 'whois.pp.ua', port: 43 });
+
+    const writer = socket.writable.getWriter();
+    const encoder = new TextEncoder();
+    await writer.write(encoder.encode(domain + '\r\n'));
+    writer.releaseLock();
+
+    const reader = socket.readable.getReader();
+    const decoder = new TextDecoder();
+    let whoisText = '';
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      reader.cancel();
+    }, 10000);
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        whoisText += decoder.decode(value, { stream: true });
       }
-    });
-
-    if (!response.ok) {
-      throw new Error(`NIC.UA API请求失败: ${response.status} ${response.statusText}`);
+      whoisText += decoder.decode();
+    } catch (readError) {
+      if (!timedOut) throw readError;
+    } finally {
+      clearTimeout(timeoutId);
+      socket.close();
     }
 
-    const data = await response.json();
-    
-    if (data.is_error) {
-       throw new Error('NIC.UA API返回错误');
+    if (timedOut && !whoisText) {
+      throw new Error('WHOIS查询超时（10秒）');
     }
 
-    const whoisText = data.whois_info || '';
-    
-    // 解析 WHOIS 文本
+    if (whoisText.includes('NOT FOUND') || whoisText.includes('No match') || whoisText.includes('Domain not found')) {
+      return {
+        success: true,
+        domain: domain,
+        registered: false,
+        raw: whoisText
+      };
+    }
+
     const parseField = (regex) => {
       const match = whoisText.match(regex);
       return match ? match[1].trim() : null;
@@ -180,8 +200,7 @@ async function queryPpUaWhois(domain) {
     const expiresOn = parseField(/Expiration Date:\s*(.+)/i);
     const updatedOn = parseField(/Last Updated On:\s*(.+)/i);
     const registrar = parseField(/Sponsoring Registrar:\s*(.+)/i);
-    
-    // 提取 Nameservers
+
     const nameservers = [];
     const nsRegex = /Name Server:\s*(.+)/gi;
     let match;
@@ -201,7 +220,7 @@ async function queryPpUaWhois(domain) {
       nameservers: nameservers,
       status: parseField(/Status:\s*(.+)/i) ? [parseField(/Status:\s*(.+)/i)] : [],
       dnssec: null,
-      raw: data
+      raw: whoisText
     };
   } catch (error) {
     return {
